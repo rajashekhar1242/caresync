@@ -1,0 +1,484 @@
+openapi: 3.0.3
+
+info:
+  title: CareSync API
+  version: 0.1.0
+  description: |
+    REST API for CareSync, a hospital/clinic management system.
+
+    **Conventions**
+    - All endpoints are served under the `/api` base path.
+    - All timestamps are ISO-8601 in UTC (`date-time`).
+    - IDs are UUIDs.
+    - Pagination is zero-based: `page=0` is the first page.
+    - Every error response uses the single `ErrorResponse` shape.
+    - Endpoints are protected by `bearerAuth` unless they declare `security: []`.
+
+servers:
+  - url: http://localhost:8080/api
+    description: Local development
+
+tags:
+  - name: Auth
+    description: Registration, login, token refresh, logout and current user
+
+security:
+  - bearerAuth: []
+
+paths:
+  /auth/register:
+    post:
+      tags: [Auth]
+      operationId: register
+      summary: Register a new patient account
+      description: |
+        Public self-registration. Always creates a user with role `PATIENT`.
+        Staff accounts (Admin, Receptionist, Doctor) are created by an Admin
+        through a separate endpoint (defined in a later part).
+        On success the user is logged in immediately.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Account created and logged in
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      operationId: login
+      summary: Log in with email and password
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      operationId: refreshToken
+      summary: Exchange a refresh token for a new token pair
+      description: |
+        Refresh tokens are rotated: each call returns a new refresh token and
+        invalidates the one that was sent. Re-using an old refresh token is
+        rejected with `401 INVALID_REFRESH_TOKEN`.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '200':
+          description: New token pair
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      operationId: logout
+      summary: Revoke a refresh token
+      description: |
+        Public on purpose: the access token may already be expired when the
+        user logs out. Idempotent: an unknown or already-revoked token still
+        returns 204.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '204':
+          description: Logged out
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      operationId: getCurrentUser
+      summary: Get the currently authenticated user
+      responses:
+        '200':
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: "Short-lived JWT access token, sent as `Authorization: Bearer <token>`."
+
+  parameters:
+    PageParam:
+      name: page
+      in: query
+      description: Zero-based page index.
+      required: false
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+    SizeParam:
+      name: size
+      in: query
+      description: Page size.
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+  schemas:
+    # ---------- Enums ----------
+    Role:
+      type: string
+      enum: [ADMIN, RECEPTIONIST, DOCTOR, PATIENT]
+
+    AppointmentStatus:
+      type: string
+      description: |
+        Allowed transitions (anything else is rejected):
+        BOOKED -> CHECKED_IN | CANCELLED | NO_SHOW,
+        CHECKED_IN -> IN_CONSULTATION,
+        IN_CONSULTATION -> COMPLETED.
+        COMPLETED, CANCELLED and NO_SHOW are terminal.
+      enum: [BOOKED, CHECKED_IN, IN_CONSULTATION, COMPLETED, CANCELLED, NO_SHOW]
+
+    InvoiceStatus:
+      type: string
+      description: |
+        PENDING: no payment yet. PARTIALLY_PAID: some payment received.
+        PAID: fully paid, immutable. VOID: cancelled before payment.
+      enum: [PENDING, PARTIALLY_PAID, PAID, VOID]
+
+    PaymentMethod:
+      type: string
+      enum: [CASH, CARD, UPI, NET_BANKING]
+
+    # ---------- Shared wrappers ----------
+    PageResponse:
+      type: object
+      description: |
+        Generic page wrapper. OpenAPI 3.0 has no generics, so each module
+        extends it with allOf and narrows `content`, for example:
+        allOf: [ {$ref: PageResponse}, {type: object, properties: {content: {type: array, items: {$ref: Patient}}}} ]
+      required: [content, page, size, totalElements, totalPages]
+      properties:
+        content:
+          type: array
+          items: {}
+        page:
+          type: integer
+          description: Zero-based index of this page.
+          example: 0
+        size:
+          type: integer
+          example: 20
+        totalElements:
+          type: integer
+          format: int64
+          example: 134
+        totalPages:
+          type: integer
+          example: 7
+
+    FieldError:
+      type: object
+      required: [field, message]
+      properties:
+        field:
+          type: string
+          description: Name of the request field that failed validation.
+          example: email
+        message:
+          type: string
+          example: must be a well-formed email address
+
+    ErrorResponse:
+      type: object
+      description: |
+        The only error format in the API. `code` is a stable, machine-readable
+        UPPER_SNAKE_CASE identifier that clients branch on; `message` is
+        human-readable. `fieldErrors` is always present (empty when not a
+        validation error).
+      required: [timestamp, status, code, message, path, fieldErrors]
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+          example: '2026-11-10T09:30:00Z'
+        status:
+          type: integer
+          description: HTTP status code.
+          example: 400
+        code:
+          type: string
+          example: VALIDATION_FAILED
+        message:
+          type: string
+          example: Request validation failed
+        path:
+          type: string
+          example: /api/auth/register
+        fieldErrors:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldError'
+
+    # ---------- Auth ----------
+    RegisterRequest:
+      type: object
+      required: [fullName, email, password]
+      properties:
+        fullName:
+          type: string
+          minLength: 2
+          maxLength: 100
+          example: Asha Reddy
+        email:
+          type: string
+          format: email
+          maxLength: 254
+          example: asha@example.com
+        password:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 72
+          description: 8-72 characters (72 is bcrypt's input limit).
+          example: S3cure-pass!
+        phone:
+          type: string
+          pattern: '^\+?[0-9]{10,15}$'
+          example: '+919876543210'
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          example: asha@example.com
+        password:
+          type: string
+          format: password
+          example: S3cure-pass!
+
+    RefreshRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+          minLength: 1
+
+    UserResponse:
+      type: object
+      required: [id, email, fullName, role]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        fullName:
+          type: string
+        role:
+          $ref: '#/components/schemas/Role'
+
+    TokenResponse:
+      type: object
+      required: [accessToken, refreshToken, tokenType, expiresIn]
+      properties:
+        accessToken:
+          type: string
+          description: JWT, short-lived (e.g. 15 minutes).
+        refreshToken:
+          type: string
+          description: Opaque, long-lived, single-use (rotated on every refresh).
+        tokenType:
+          type: string
+          enum: [Bearer]
+        expiresIn:
+          type: integer
+          description: Access token lifetime in seconds.
+          example: 900
+
+    AuthResponse:
+      allOf:
+        - $ref: '#/components/schemas/TokenResponse'
+        - type: object
+          required: [user]
+          properties:
+            user:
+              $ref: '#/components/schemas/UserResponse'
+
+  responses:
+    BadRequest:
+      description: Validation failed or the request body is malformed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            validationFailed:
+              summary: Field validation errors
+              value:
+                timestamp: '2026-11-10T09:30:00Z'
+                status: 400
+                code: VALIDATION_FAILED
+                message: Request validation failed
+                path: /api/auth/register
+                fieldErrors:
+                  - field: email
+                    message: must be a well-formed email address
+                  - field: password
+                    message: size must be between 8 and 72
+            malformedRequest:
+              summary: Unparseable JSON or wrong types
+              value:
+                timestamp: '2026-11-10T09:30:00Z'
+                status: 400
+                code: MALFORMED_REQUEST
+                message: Request body is missing or malformed
+                path: /api/auth/login
+                fieldErrors: []
+
+    Unauthorized:
+      description: |
+        Missing, invalid or expired credentials. Clients must use `code`, not
+        the message, to decide what to do: only `TOKEN_EXPIRED` should trigger
+        the refresh flow.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            invalidCredentials:
+              summary: Wrong email or password
+              value:
+                timestamp: '2026-11-10T09:30:00Z'
+                status: 401
+                code: INVALID_CREDENTIALS
+                message: Invalid email or password
+                path: /api/auth/login
+                fieldErrors: []
+            tokenExpired:
+              summary: Access token expired (client should refresh)
+              value:
+                timestamp: '2026-11-10T09:30:00Z'
+                status: 401
+                code: TOKEN_EXPIRED
+                message: Access token has expired
+                path: /api/auth/me
+                fieldErrors: []
+            invalidRefreshToken:
+              summary: Refresh token unknown, expired or already used
+              value:
+                timestamp: '2026-11-10T09:30:00Z'
+                status: 401
+                code: INVALID_REFRESH_TOKEN
+                message: Refresh token is invalid or has been used
+                path: /api/auth/refresh
+                fieldErrors: []
+
+    Forbidden:
+      description: Authenticated, but the role or ownership rules do not allow this action.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            timestamp: '2026-11-10T09:30:00Z'
+            status: 403
+            code: ACCESS_DENIED
+            message: You do not have permission to perform this action
+            path: /api/patients/3f2b8a52-6c1e-4f4e-9a55-0d7f4c1b9a10
+            fieldErrors: []
+
+    NotFound:
+      description: The requested resource does not exist (or is not visible to the caller).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            timestamp: '2026-11-10T09:30:00Z'
+            status: 404
+            code: RESOURCE_NOT_FOUND
+            message: Resource not found
+            path: /api/patients/3f2b8a52-6c1e-4f4e-9a55-0d7f4c1b9a10
+            fieldErrors: []
+
+    Conflict:
+      description: The request conflicts with the current state of the resource.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            emailAlreadyExists:
+              summary: Email already registered
+              value:
+                timestamp: '2026-11-10T09:30:00Z'
+                status: 409
+                code: EMAIL_ALREADY_EXISTS
+                message: An account with this email already exists
+                path: /api/auth/register
+                fieldErrors: []
+            slotAlreadyBooked:
+              summary: Appointment slot was taken
+              value:
+                timestamp: '2026-11-10T09:30:00Z'
+                status: 409
+                code: SLOT_ALREADY_BOOKED
+                message: This slot is already booked
+                path: /api/appointments
+                fieldErrors: []
