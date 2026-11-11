@@ -9,6 +9,10 @@ info:
     **Conventions**
     - All endpoints are served under the `/api` base path.
     - All timestamps are ISO-8601 in UTC (`date-time`).
+    - Calendar dates and times of day without a zone (leave dates, schedule
+      `HH:mm`, the slots `date` query) are in the clinic's IANA time zone.
+    - 400 means a value in the request is unacceptable; 409 means a valid
+      request conflicts with the current state of a resource.
     - IDs are UUIDs.
     - Pagination is zero-based: `page=0` is the first page.
     - Every error response uses the single `ErrorResponse` shape.
@@ -19,8 +23,28 @@ servers:
     description: Local development
 
 tags:
+  - name: Departments
+    description: Hospital departments
+  - name: Doctors
+    description: Doctor profiles, weekly schedules and leaves
+  - name: Patients
+    description: Patient records and search
+  - name: Specializations
+    description: Medical specializations (read-only reference data)
+  - name: Clinics
+    description: Clinics and their time zones (read-only reference data)
+  - name: Appointments
+    description: Bookable slots, booking and status transitions  
   - name: Auth
     description: Registration, login, token refresh, logout and current user
+  - name: Consultations
+    description: "Clinical notes written by the treating doctor. A doctor has treated a patient once they have written at least one consultation for that patient."
+  - name: Medicines
+    description: Medicine catalog (read-only reference data)
+  - name: Prescriptions
+    description: Prescriptions, the allergy and interaction safety check, and PDFs
+  - name: Billing
+    description: Invoices, payments and credit notes. Invoices are created automatically when an appointment moves to COMPLETED, so there is no endpoint to create one.
 
 security:
   - bearerAuth: []
@@ -33,9 +57,9 @@ paths:
       summary: Register a new patient account
       description: |
         Public self-registration. Always creates a user with role `PATIENT`.
-        Staff accounts (Admin, Receptionist, Doctor) are created by an Admin
-        through a separate endpoint (defined in a later part).
-        On success the user is logged in immediately.
+        Also creates the linked Patient record (fullName, email, phone).
+        Doctor accounts are created by an Admin via `POST /doctors`; Admin and
+        Receptionist accounts via a staff endpoint defined in a later part..
       security: []
       requestBody:
         required: true
@@ -143,7 +167,1458 @@ paths:
                 $ref: '#/components/schemas/UserResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
+  
+  /departments:
+    get:
+      tags: [Departments]
+      operationId: listDepartments
+      summary: List departments
+      description: |
+        **Roles:** any authenticated user.
+        Sorted by name. Small bounded list, so it is not paginated.
+      responses:
+        '200':
+          description: Departments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DepartmentResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Departments]
+      operationId: createDepartment
+      summary: Create a department
+      description: |
+        **Roles:** ADMIN.
+        Duplicate names (case-insensitive) return `409 DEPARTMENT_NAME_EXISTS`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DepartmentRequest'
+      responses:
+        '201':
+          description: Department created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DepartmentResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
 
+  /departments/{departmentId}:
+    parameters:
+      - $ref: '#/components/parameters/DepartmentId'
+    put:
+      tags: [Departments]
+      operationId: updateDepartment
+      summary: Update a department (full replacement)
+      description: |
+        **Roles:** ADMIN.
+        Duplicate names return `409 DEPARTMENT_NAME_EXISTS`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DepartmentRequest'
+      responses:
+        '200':
+          description: Department updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DepartmentResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /doctors:
+    get:
+      tags: [Doctors]
+      operationId: listDoctors
+      summary: List and filter doctors
+      description: |
+        **Roles:** any authenticated user (patients browse doctors to book).
+        PATIENT callers only see `active` doctors; staff see all.
+        `name` is a case-insensitive "contains" match on the full name.
+        Filters combine with AND.
+      parameters:
+        - name: specializationId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: clinicId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: name
+          in: query
+          required: false
+          schema:
+            type: string
+            minLength: 2
+            maxLength: 100
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+        - name: sort
+          in: query
+          required: false
+          description: Sort field and direction.
+          schema:
+            type: string
+            enum:
+              - fullName,asc
+              - fullName,desc
+              - consultationFee,asc
+              - consultationFee,desc
+            default: fullName,asc
+      responses:
+        '200':
+          description: A page of doctors
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DoctorPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Doctors]
+      operationId: createDoctor
+      summary: Create a doctor (and their login account)
+      description: |
+        **Roles:** ADMIN.
+        Creates a user with role `DOCTOR` plus the doctor profile in one
+        transaction. A duplicate email returns `409 EMAIL_ALREADY_EXISTS`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DoctorCreateRequest'
+      responses:
+        '201':
+          description: Doctor created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DoctorResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /doctors/{doctorId}:
+    parameters:
+      - $ref: '#/components/parameters/DoctorId'
+    get:
+      tags: [Doctors]
+      operationId: getDoctor
+      summary: Get a doctor
+      description: |
+        **Roles:** any authenticated user. PATIENT callers get 404 for
+        inactive doctors.
+      responses:
+        '200':
+          description: Doctor
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DoctorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Doctors]
+      operationId: updateDoctor
+      summary: Update a doctor (full replacement)
+      description: |
+        **Roles:** ADMIN.
+        Changing `slotMinutes` only affects slots generated from now on;
+        existing appointments are never modified. Setting `active: false`
+        hides the doctor from booking but keeps history.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DoctorUpdateRequest'
+      responses:
+        '200':
+          description: Doctor updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DoctorResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /doctors/{doctorId}/schedules:
+    parameters:
+      - $ref: '#/components/parameters/DoctorId'
+    get:
+      tags: [Doctors]
+      operationId: getDoctorSchedule
+      summary: Get a doctor's weekly availability
+      description: |
+        **Roles:** ADMIN, RECEPTIONIST, DOCTOR (own schedule only).
+        Patients do not call this; they use the bookable-slots endpoint
+        (defined in a later part).
+      responses:
+        '200':
+          description: Weekly schedule (empty `entries` if none set)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WeeklyScheduleResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Doctors]
+      operationId: replaceDoctorSchedule
+      summary: Replace a doctor's weekly availability
+      description: |
+        **Roles:** ADMIN, DOCTOR (own schedule only).
+        Replaces the whole weekly schedule atomically (send an empty
+        `entries` array to clear it). A day may have several ranges
+        (e.g. morning and afternoon).
+
+        Rules: `startTime` < `endTime`; ranges on the same day must not
+        overlap; each range must be at least `slotMinutes` long. Violations
+        return `400 INVALID_SCHEDULE` with details in `fieldErrors`.
+
+        Times are clinic wall-clock times. Existing appointments are not
+        touched; the change only affects slots generated afterwards.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WeeklyScheduleRequest'
+      responses:
+        '200':
+          description: Schedule saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WeeklyScheduleResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /doctors/{doctorId}/leaves:
+    parameters:
+      - $ref: '#/components/parameters/DoctorId'
+    get:
+      tags: [Doctors]
+      operationId: listDoctorLeaves
+      summary: List a doctor's leaves
+      description: |
+        **Roles:** ADMIN, RECEPTIONIST, DOCTOR (own leaves only).
+        Sorted by `startDate` ascending. With `from`/`to`, returns leaves
+        that overlap that date range. Not paginated (bounded per doctor).
+      parameters:
+        - name: from
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Leaves
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LeaveResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Doctors]
+      operationId: createDoctorLeave
+      summary: Add a leave (full days, inclusive range)
+      description: |
+        **Roles:** ADMIN, DOCTOR (own leaves only).
+        Dates are clinic-local. `startDate` must not be before today in the
+        clinic's time zone and `endDate` >= `startDate` (otherwise 400).
+        409 cases: `LEAVE_OVERLAP` (overlaps an existing leave) and
+        `LEAVE_HAS_BOOKED_APPOINTMENTS` (a BOOKED or CHECKED_IN appointment
+        falls in the range; reschedule or cancel it first).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LeaveRequest'
+      responses:
+        '201':
+          description: Leave created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LeaveResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /doctors/{doctorId}/leaves/{leaveId}:
+    parameters:
+      - $ref: '#/components/parameters/DoctorId'
+      - $ref: '#/components/parameters/LeaveId'
+    delete:
+      tags: [Doctors]
+      operationId: deleteDoctorLeave
+      summary: Delete a leave
+      description: |
+        **Roles:** ADMIN, DOCTOR (own leaves only).
+        Deleting reopens the slots for that range.
+      responses:
+        '204':
+          description: Leave deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /patients:
+    get:
+      tags: [Patients]
+      operationId: searchPatients
+      summary: Search patients by phone or name
+      description: |
+        **Roles:** ADMIN, RECEPTIONIST, DOCTOR (results limited to the
+        doctor's own patients). PATIENT callers get 403.
+        `phone` is a prefix match on the normalized number; `name` is a
+        case-insensitive "contains" match. Both are optional and combine
+        with AND. Returns summaries only; full records come from
+        `GET /patients/{patientId}` (which is audited).
+      parameters:
+        - name: phone
+          in: query
+          required: false
+          schema:
+            type: string
+            pattern: '^\+?[0-9]{3,15}$'
+        - name: name
+          in: query
+          required: false
+          schema:
+            type: string
+            minLength: 2
+            maxLength: 100
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+      responses:
+        '200':
+          description: A page of patient summaries
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [Patients]
+      operationId: createPatient
+      summary: Create a patient record (walk-in registration)
+      description: |
+        **Roles:** ADMIN, RECEPTIONIST.
+        Creates a record with no login account (`userId` is null).
+        Self-registered patients get their record automatically from
+        `POST /auth/register`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatientRequest'
+      responses:
+        '201':
+          description: Patient created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /patients/{patientId}:
+    parameters:
+      - $ref: '#/components/parameters/PatientId'
+    get:
+      tags: [Patients]
+      operationId: getPatient
+      summary: Get a patient record
+      description: |
+        **Roles:** ADMIN, RECEPTIONIST, DOCTOR (own patients only),
+        PATIENT (own record only). Any other combination returns 403.
+        Every successful read writes an audit log entry.
+      responses:
+        '200':
+          description: Patient
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Patients]
+      operationId: updatePatient
+      summary: Update a patient record (full replacement)
+      description: |
+        **Roles:** ADMIN, RECEPTIONIST, PATIENT (own record only).
+        `allergies` replaces the whole list (send `[]` to clear it).
+        The server trims entries and removes case-insensitive duplicates.
+        Doctors cannot edit here; clinical allergy updates by doctors get
+        a dedicated endpoint in the consultations part.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatientRequest'
+      responses:
+        '200':
+          description: Patient updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PatientResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /specializations:
+    get:
+      tags: [Specializations]
+      operationId: listSpecializations
+      summary: List specializations
+      description: |
+        **Roles:** any authenticated user.
+        Sorted by name. Small bounded list, so it is not paginated.
+      responses:
+        '200':
+          description: Specializations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SpecializationResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /clinics:
+    get:
+      tags: [Clinics]
+      operationId: listClinics
+      summary: List clinics
+      description: |
+        **Roles:** any authenticated user.
+        Sorted by name. Small bounded list, so it is not paginated.
+        Each clinic carries its IANA `timeZone`.
+      responses:
+        '200':
+          description: Clinics
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ClinicResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /doctors/{doctorId}/slots:
+    parameters:
+      - $ref: '#/components/parameters/DoctorId'
+    get:
+      tags: [Appointments]
+      operationId: listDoctorSlots
+      summary: List a doctor's slots for one clinic-local day
+      description: |
+        **Roles:** any authenticated user. PATIENT callers get 404 for
+        inactive doctors.
+
+        `date` is a calendar date in the doctor's clinic time zone, not UTC.
+        Slots are generated from the weekly schedule using the doctor's
+        `slotMinutes` and returned in chronological order, with UTC
+        `start`/`end` plus the clinic `timeZone` so the client can display
+        local times.
+
+        A slot has `available: false` when a non-cancelled appointment holds
+        it or it has already started. When the whole day is closed, `slots`
+        is empty and `closedReason` says why. A `date` before today or more
+        than 30 days after today (clinic time) is not an error: it returns
+        `closedReason: OUTSIDE_BOOKING_WINDOW`.
+      parameters:
+        - name: date
+          in: query
+          required: true
+          description: Clinic-local date.
+          schema:
+            type: string
+            format: date
+            example: '2026-11-12'
+      responses:
+        '200':
+          description: Slots for the day
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SlotListResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /appointments:
+    get:
+      tags: [Appointments]
+      operationId: listAppointments
+      summary: List appointments
+      description: |
+        **Roles:** ADMIN, RECEPTIONIST (all appointments); DOCTOR (own
+        appointments only); PATIENT (own appointments only).
+        DOCTOR and PATIENT results are scoped automatically. Passing a
+        `doctorId` (DOCTOR caller) or `patientId` (PATIENT caller) that is
+        not their own returns 403.
+
+        `from` is inclusive and `to` is exclusive; both filter on
+        `slotStart` and are UTC instants. `from` must be before `to`
+        (otherwise 400). Filters combine with AND.
+      parameters:
+        - name: doctorId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: patientId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          required: false
+          description: Comma-separated list, for example `BOOKED,CHECKED_IN`.
+          style: form
+          explode: false
+          schema:
+            type: array
+            minItems: 1
+            items:
+              $ref: '#/components/schemas/AppointmentStatus'
+        - name: from
+          in: query
+          required: false
+          description: Inclusive lower bound on `slotStart` (UTC).
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          required: false
+          description: Exclusive upper bound on `slotStart` (UTC).
+          schema:
+            type: string
+            format: date-time
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+        - name: sort
+          in: query
+          required: false
+          description: Sort field and direction.
+          schema:
+            type: string
+            enum:
+              - slotStart,asc
+              - slotStart,desc
+            default: slotStart,asc
+      responses:
+        '200':
+          description: A page of appointments
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppointmentPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [Appointments]
+      operationId: bookAppointment
+      summary: Book an appointment
+      description: |
+        **Roles:** PATIENT (own `patientId` only), RECEPTIONIST, ADMIN.
+        DOCTOR callers get 403. A PATIENT caller sending someone else's
+        `patientId` gets 403.
+
+        `slotStart` must equal the UTC `start` of a slot returned by
+        `GET /doctors/{doctorId}/slots`. The appointment is created as
+        `BOOKED`; `slotEnd` is fixed at booking time from the doctor's
+        `slotMinutes`.
+
+        Checks run in this order:
+        1. `400 VALIDATION_FAILED`: missing or malformed fields.
+        2. `400 INVALID_SLOT`: `slotStart` is not the start of a slot in
+           the doctor's weekly schedule.
+        3. `400 OUTSIDE_BOOKING_WINDOW`: the slot has already started, or
+           its clinic-local date is more than 30 days after today.
+        4. `409 DOCTOR_UNAVAILABLE`: the doctor is inactive or on leave
+           that day.
+        5. `409 SLOT_ALREADY_BOOKED`: another non-cancelled appointment
+           holds the slot. When two requests race, exactly one wins.
+
+        The 400 codes in steps 2 and 3 include a `fieldErrors` entry for
+        `slotStart`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AppointmentCreateRequest'
+      responses:
+        '201':
+          description: Appointment booked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppointmentResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /appointments/{appointmentId}:
+    parameters:
+      - $ref: '#/components/parameters/AppointmentId'
+    get:
+      tags: [Appointments]
+      operationId: getAppointment
+      summary: Get an appointment
+      description: |
+        **Roles:** ADMIN, RECEPTIONIST, DOCTOR (own appointments only),
+        PATIENT (own appointments only). Any other combination returns 403.
+      responses:
+        '200':
+          description: Appointment
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppointmentResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /appointments/{appointmentId}/status:
+    parameters:
+      - $ref: '#/components/parameters/AppointmentId'
+    patch:
+      tags: [Appointments]
+      operationId: updateAppointmentStatus
+      summary: Move an appointment to a new status
+      description: |
+        Moves the appointment to the requested `status`. The allowed
+        transitions are listed in `AppointmentStatus`. Anything else,
+        including requesting the current status or `BOOKED`, returns
+        `409 ILLEGAL_STATE_TRANSITION`.
+
+        **Roles by target status** (a role not listed gets 403):
+        - `CHECKED_IN`: RECEPTIONIST, ADMIN.
+        - `IN_CONSULTATION`, `COMPLETED`: DOCTOR (own appointments only).
+        - `CANCELLED`: PATIENT (own), DOCTOR (own), RECEPTIONIST, ADMIN.
+        - `NO_SHOW`: RECEPTIONIST, ADMIN.
+
+        Checks run in this order: 404, 403 (role and ownership),
+        `409 ILLEGAL_STATE_TRANSITION`, then these time rules:
+        - `CANCELLED`: only when `slotStart` is at least 2 hours from now,
+          otherwise `409 CANCELLATION_WINDOW_CLOSED`.
+        - `CHECKED_IN`: not before the slot's clinic-local date, otherwise
+          `409 TRANSITION_TOO_EARLY`.
+        - `NO_SHOW`: not before `slotStart`, otherwise
+          `409 TRANSITION_TOO_EARLY`.
+
+        `COMPLETED` also needs a consultation for this appointment with a
+        non-blank `diagnosis`, otherwise `409 CONSULTATION_INCOMPLETE`. On
+        success the consultation is finalized (no further edits) and the
+        invoice is created, all in one transaction.  
+
+        `reason` is stored as `cancellationReason` when the target is
+        `CANCELLED` and ignored otherwise.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AppointmentStatusUpdateRequest'
+      responses:
+        '200':
+          description: Status updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppointmentResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  
+    
+  /appointments/{appointmentId}/consultation:
+    parameters:
+      - $ref: '#/components/parameters/AppointmentId'
+    get:
+      tags: [Consultations]
+      operationId: getAppointmentConsultation
+      summary: Get the consultation of an appointment
+      description: |
+        **Roles:** ADMIN, DOCTOR (the appointment's doctor, or a doctor who
+        has treated this patient), PATIENT (own appointment only).
+        RECEPTIONIST gets 403.
+
+        Returns 404 when the appointment exists but has no consultation yet,
+        so the doctor's screen can offer to start one. Every successful read
+        writes an audit log entry.
+      responses:
+        '200':
+          description: Consultation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsultationResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Consultations]
+      operationId: createConsultation
+      summary: Start the consultation for an appointment
+      description: |
+        **Roles:** DOCTOR (the appointment's doctor only). Everyone else
+        gets 403.
+
+        Allowed only while the appointment is `IN_CONSULTATION`, otherwise
+        `409 APPOINTMENT_NOT_IN_CONSULTATION`. An appointment has at most
+        one consultation; a second create returns
+        `409 CONSULTATION_ALREADY_EXISTS`.
+
+        Every body field is optional so the doctor can save a draft.
+        Checks run in this order: 400, 404, 403, 409.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConsultationRequest'
+      responses:
+        '201':
+          description: Consultation created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsultationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /consultations/{consultationId}:
+    parameters:
+      - $ref: '#/components/parameters/ConsultationId'
+    get:
+      tags: [Consultations]
+      operationId: getConsultation
+      summary: Get a consultation
+      description: |
+        **Roles:** ADMIN, DOCTOR (the treating doctor, or a doctor who has
+        treated this patient), PATIENT (own consultations only).
+        RECEPTIONIST gets 403. Every successful read writes an audit log
+        entry.
+      responses:
+        '200':
+          description: Consultation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsultationResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Consultations]
+      operationId: updateConsultation
+      summary: Update a consultation (full replacement)
+      description: |
+        **Roles:** DOCTOR (the treating doctor only). Everyone else gets 403.
+
+        Replaces all writable fields, so a field left out is cleared.
+        A consultation is finalized when its appointment moves to
+        `COMPLETED`; after that every update returns
+        `409 CONSULTATION_FINALIZED`.
+        Checks run in this order: 400, 404, 403, 409.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConsultationRequest'
+      responses:
+        '200':
+          description: Consultation updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConsultationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /medicines:
+    get:
+      tags: [Medicines]
+      operationId: searchMedicines
+      summary: Search the medicine catalog
+      description: |
+        **Roles:** DOCTOR, ADMIN. Other roles get 403.
+
+        `name` is a case-insensitive "contains" match on the medicine name,
+        generic name or drug class. Without `name` the whole catalog is
+        paged. Results are sorted by name ascending.
+      parameters:
+        - name: name
+          in: query
+          required: false
+          schema:
+            type: string
+            minLength: 2
+            maxLength: 100
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+      responses:
+        '200':
+          description: A page of medicines
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MedicinePage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /prescriptions/check:
+    post:
+      tags: [Prescriptions]
+      operationId: checkPrescription
+      summary: Check medicines for allergy and interaction warnings
+      description: |
+        **Roles:** DOCTOR, for patients who have a non-cancelled appointment
+        with that doctor. Everyone else gets 403.
+
+        Read-only, nothing is saved, so the form can call it on every change.
+        Warnings come from the patient's stored `allergies` and the listed
+        medicines only; earlier prescriptions are not considered.
+
+        - ALLERGY: an allergy entry equals, ignoring case, the medicine's
+          `name`, `genericName` or `drugClass`.
+        - INTERACTION: the pair of medicines is in the server's interaction
+          table.
+
+        Warnings are sorted by severity (SEVERE first), then by type. An
+        empty `warnings` array means nothing was found, not that the
+        combination is proven safe. An unknown `patientId` or `medicineIds`
+        entry returns 404. Checks run in this order: 400, 404, 403.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PrescriptionCheckRequest'
+      responses:
+        '200':
+          description: Warnings found, possibly none
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrescriptionCheckResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /prescriptions:
+    post:
+      tags: [Prescriptions]
+      operationId: createPrescription
+      summary: Create a prescription for a consultation
+      description: |
+        **Roles:** DOCTOR (the consultation's doctor only). Everyone else
+        gets 403.
+
+        The patient comes from the consultation. A medicine may appear only
+        once in `items` (otherwise 400). A prescription is immutable once
+        created.
+
+        The server recomputes the safety warnings itself, with the same rules
+        as `POST /prescriptions/check`, and never trusts warnings from the
+        client. If any warning is SEVERE and `acknowledgeSevereWarnings` is
+        not true, the request fails with
+        `409 SEVERE_WARNING_NOT_ACKNOWLEDGED` and nothing is saved. MILD and
+        MODERATE warnings never block. The warnings found are saved with the
+        prescription.
+
+        Checks run in this order: 400, 404, 403, then 409 with
+        `CONSULTATION_FINALIZED`, `PRESCRIPTION_ALREADY_EXISTS`,
+        `SEVERE_WARNING_NOT_ACKNOWLEDGED`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PrescriptionCreateRequest'
+      responses:
+        '201':
+          description: Prescription created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrescriptionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /prescriptions/{prescriptionId}:
+    parameters:
+      - $ref: '#/components/parameters/PrescriptionId'
+    get:
+      tags: [Prescriptions]
+      operationId: getPrescription
+      summary: Get a prescription
+      description: |
+        **Roles:** ADMIN, DOCTOR (the prescribing doctor, or a doctor who has
+        treated this patient), PATIENT (own prescriptions only).
+        RECEPTIONIST gets 403. Every successful read writes an audit log
+        entry.
+      responses:
+        '200':
+          description: Prescription
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrescriptionResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /prescriptions/{prescriptionId}/pdf:
+    parameters:
+      - $ref: '#/components/parameters/PrescriptionId'
+    get:
+      tags: [Prescriptions]
+      operationId: getPrescriptionPdf
+      summary: Download a prescription as a PDF
+      description: |
+        **Roles:** same as `GET /prescriptions/{prescriptionId}`. Every
+        successful download writes an audit log entry.
+
+        Needs the bearer token, so the client must fetch it with Axios
+        (`responseType: blob`) rather than a plain link. Send
+        `Accept: application/pdf, application/json`, because errors come back
+        as `ErrorResponse` JSON.
+      responses:
+        '200':
+          description: The prescription as a PDF file
+          headers:
+            Content-Disposition:
+              description: Suggested file name.
+              schema:
+                type: string
+                example: 'attachment; filename="prescription-7c9e6679.pdf"'
+            Cache-Control:
+              description: Always no-store because the file holds patient data.
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /patients/{patientId}/prescriptions:
+    parameters:
+      - $ref: '#/components/parameters/PatientId'
+    get:
+      tags: [Prescriptions]
+      operationId: listPatientPrescriptions
+      summary: List a patient's prescriptions
+      description: |
+        **Roles:** ADMIN, DOCTOR (a doctor who has treated this patient),
+        PATIENT (own record only). RECEPTIONIST gets 403.
+
+        Newest first. Every successful read writes an audit log entry.
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+      responses:
+        '200':
+          description: A page of prescriptions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PrescriptionPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'  
+
+  /invoices:
+    get:
+      tags: [Billing]
+      operationId: listInvoices
+      summary: List invoices
+      description: |
+        **Roles:** ADMIN, RECEPTIONIST (all invoices); PATIENT (own invoices
+        only). DOCTOR gets 403.
+        PATIENT results are scoped automatically. Passing a `patientId` that
+        is not their own returns 403.
+
+        `from` is inclusive and `to` is exclusive; both filter on `createdAt`
+        and are UTC instants. `from` must be before `to` (otherwise 400).
+        Filters combine with AND. Newest first.
+      parameters:
+        - name: status
+          in: query
+          required: false
+          description: Comma-separated list, for example `PENDING,PARTIALLY_PAID`.
+          style: form
+          explode: false
+          schema:
+            type: array
+            minItems: 1
+            items:
+              $ref: '#/components/schemas/InvoiceStatus'
+        - name: patientId
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: from
+          in: query
+          required: false
+          description: Inclusive lower bound on `createdAt` (UTC).
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          required: false
+          description: Exclusive upper bound on `createdAt` (UTC).
+          schema:
+            type: string
+            format: date-time
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+      responses:
+        '200':
+          description: A page of invoice summaries
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoicePage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /invoices/{invoiceId}:
+    parameters:
+      - $ref: '#/components/parameters/InvoiceId'
+    get:
+      tags: [Billing]
+      operationId: getInvoice
+      summary: Get an invoice with its items, payments and credit notes
+      description: |
+        **Roles:** ADMIN, RECEPTIONIST, PATIENT (own invoices only).
+        DOCTOR gets 403, and so does a PATIENT asking for someone else's
+        invoice.
+      responses:
+        '200':
+          description: Invoice
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /invoices/{invoiceId}/pdf:
+    parameters:
+      - $ref: '#/components/parameters/InvoiceId'
+    get:
+      tags: [Billing]
+      operationId: getInvoicePdf
+      summary: Download an invoice as a PDF
+      description: |
+        **Roles:** same as `GET /invoices/{invoiceId}`.
+
+        The PDF shows the items, totals, payments, credit notes and current
+        status. It needs the bearer token, so the client must fetch it with
+        Axios (`responseType: blob`) rather than a plain link. Send
+        `Accept: application/pdf, application/json`, because errors come back
+        as `ErrorResponse` JSON.
+      responses:
+        '200':
+          description: The invoice as a PDF file
+          headers:
+            Content-Disposition:
+              description: Suggested file name.
+              schema:
+                type: string
+                example: 'attachment; filename="invoice-INV-2026-000123.pdf"'
+            Cache-Control:
+              description: Always no-store because the file holds patient data.
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /invoices/{invoiceId}/items:
+    parameters:
+      - $ref: '#/components/parameters/InvoiceId'
+    post:
+      tags: [Billing]
+      operationId: addInvoiceItem
+      summary: Add a line item to an invoice
+      description: |
+        **Roles:** ADMIN, RECEPTIONIST. Everyone else gets 403.
+
+        Allowed while the invoice is `PENDING` or `PARTIALLY_PAID`. A `PAID`
+        or `VOID` invoice returns `409 INVOICE_IMMUTABLE`. Adding an item
+        raises `total` and `balance`; the status does not change. The server
+        computes `lineTotal` as `quantity` times `unitPrice`.
+        Checks run in this order: 400, 404, 403, 409.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvoiceItemRequest'
+      responses:
+        '201':
+          description: Item added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceItemResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /invoices/{invoiceId}/payments:
+    parameters:
+      - $ref: '#/components/parameters/InvoiceId'
+    post:
+      tags: [Billing]
+      operationId: recordPayment
+      summary: Record a payment against an invoice
+      description: |
+        **Roles:** ADMIN, RECEPTIONIST. Everyone else gets 403.
+        This records a payment taken at the counter. There is no online
+        payment gateway in this contract.
+
+        Partial payments are allowed. After each payment the status is
+        `PARTIALLY_PAID` while `amountPaid` is below `total`, and `PAID` once
+        it equals `total`; one payment can go straight from `PENDING` to
+        `PAID`. `paidAt` is set at that moment and the invoice is immutable
+        from then on.
+
+        `amount` must be greater than 0.00. `txnRef` is required for CARD,
+        UPI and NET_BANKING and optional for CASH. A `txnRef` already used by
+        another payment with the same method returns
+        `409 DUPLICATE_TXN_REF`, which protects against double submits.
+
+        Concurrent payments on one invoice are serialized by the server, so
+        the second request is checked against the balance left by the first.
+
+        Checks run in this order: `400 VALIDATION_FAILED`, 404, 403,
+        `409 INVOICE_IMMUTABLE` (the invoice is PAID or VOID),
+        `409 DUPLICATE_TXN_REF`, then `400 OVERPAYMENT` when `amount` is more
+        than the current `balance`. OVERPAYMENT comes last because it depends
+        on the current balance.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentRequest'
+      responses:
+        '201':
+          description: Payment recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /invoices/{invoiceId}/credit-notes:
+    parameters:
+      - $ref: '#/components/parameters/InvoiceId'
+    post:
+      tags: [Billing]
+      operationId: createCreditNote
+      summary: Issue a credit note to correct a PAID invoice
+      description: |
+        **Roles:** ADMIN only. Everyone else gets 403.
+
+        A PAID invoice is never edited. A credit note is a separate document
+        that records a correction. It is allowed only on a `PAID` invoice,
+        otherwise `409 INVOICE_NOT_PAID` (unpaid invoices are corrected by
+        other means). The sum of all credit notes on an invoice cannot exceed
+        its `total`, otherwise `400 CREDIT_EXCEEDS_INVOICE`.
+
+        The invoice stays `PAID`; its `creditedTotal` and `netTotal` change.
+        Recording the refund itself is out of scope for this contract.
+        Concurrent credit notes on one invoice are serialized by the server.
+
+        Checks run in this order: `400 VALIDATION_FAILED`, 404, 403,
+        `409 INVOICE_NOT_PAID`, then `400 CREDIT_EXCEEDS_INVOICE`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreditNoteRequest'
+      responses:
+        '201':
+          description: Credit note issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreditNoteResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /appointments/{appointmentId}/invoice:
+    parameters:
+      - $ref: '#/components/parameters/AppointmentId'
+    get:
+      tags: [Billing]
+      operationId: getAppointmentInvoice
+      summary: Get the invoice of an appointment
+      description: |
+        **Roles:** ADMIN, RECEPTIONIST, PATIENT (own appointments only).
+        DOCTOR gets 403.
+
+        Returns 404 when the appointment has no invoice yet, which is the
+        case until it is `COMPLETED`. Checks run in this order: 404 for an
+        unknown appointment, 403, then 404 for a missing invoice.
+      responses:
+        '200':
+          description: Invoice
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
 components:
   securitySchemes:
     bearerAuth:
@@ -172,6 +1647,62 @@ components:
         minimum: 1
         maximum: 100
         default: 20
+    DepartmentId:
+      name: departmentId
+      in: path
+      required: true  
+      schema:
+        type: string
+        format: uuid
+    DoctorId:
+      name: doctorId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    LeaveId:
+      name: leaveId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    PatientId:
+      name: patientId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    AppointmentId:
+      name: appointmentId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ConsultationId:
+      name: consultationId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    PrescriptionId:
+      name: prescriptionId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    InvoiceId:
+      name: invoiceId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid        
 
   schemas:
     # ---------- Enums ----------
@@ -205,8 +1736,8 @@ components:
       type: object
       description: |
         Generic page wrapper. OpenAPI 3.0 has no generics, so each module
-        extends it with allOf and narrows `content`, for example:
-        allOf: [ {$ref: PageResponse}, {type: object, properties: {content: {type: array, items: {$ref: Patient}}}} ]
+        extends it with allOf and narrows `content` to its own item type
+        (see DoctorPage and PatientPage).
       required: [content, page, size, totalElements, totalPages]
       properties:
         content:
@@ -332,6 +1863,16 @@ components:
           type: string
         role:
           $ref: '#/components/schemas/Role'
+        patientId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Set when role is PATIENT.
+        doctorId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Set when role is DOCTOR.
 
     TokenResponse:
       type: object
@@ -360,6 +1901,1081 @@ components:
             user:
               $ref: '#/components/schemas/UserResponse'
 
+        # ---------- Shared enums (part 2) ----------
+    Gender:
+      type: string
+      enum: [MALE, FEMALE, OTHER]
+
+    DayOfWeek:
+      type: string
+      enum: [MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY]
+
+    # ---------- Departments ----------
+    DepartmentRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 100
+          example: Cardiology
+        description:
+          type: string
+          maxLength: 500
+          example: Heart and vascular care
+
+    DepartmentResponse:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+
+    # ---------- Doctors ----------
+    DoctorCreateRequest:
+      type: object
+      required: [fullName, email, password, specializationId, clinicId, consultationFee, slotMinutes]
+      properties:
+        fullName:
+          type: string
+          minLength: 2
+          maxLength: 100
+          example: Dr. Ravi Kumar
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        password:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 72
+          description: Initial password set by the admin.
+        phone:
+          type: string
+          pattern: '^\+?[0-9]{10,15}$'
+        specializationId:
+          type: string
+          format: uuid
+        clinicId:
+          type: string
+          format: uuid
+        consultationFee:
+          $ref: '#/components/schemas/Money'
+        slotMinutes:
+          type: integer
+          minimum: 5
+          maximum: 120
+          multipleOf: 5
+          description: Length of one appointment slot.
+          example: 15
+
+    DoctorUpdateRequest:
+      type: object
+      required: [fullName, specializationId, clinicId, consultationFee, slotMinutes, active]
+      properties:
+        fullName:
+          type: string
+          minLength: 2
+          maxLength: 100
+        phone:
+          type: string
+          pattern: '^\+?[0-9]{10,15}$'
+        specializationId:
+          type: string
+          format: uuid
+        clinicId:
+          type: string
+          format: uuid
+        consultationFee:
+          $ref: '#/components/schemas/Money'
+        slotMinutes:
+          type: integer
+          minimum: 5
+          maximum: 120
+          multipleOf: 5
+        active:
+          type: boolean
+
+    DoctorResponse:
+      type: object
+      description: Contact details are intentionally omitted because patients can read this.
+      required: [id, userId, fullName, specializationId, clinicId, consultationFee, slotMinutes, active]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Doctor profile id (not the user id).
+        userId:
+          type: string
+          format: uuid
+        fullName:
+          type: string
+        specializationId:
+          type: string
+          format: uuid
+        clinicId:
+          type: string
+          format: uuid
+        consultationFee:
+          $ref: '#/components/schemas/Money'
+        slotMinutes:
+          type: integer
+          example: 15
+        active:
+          type: boolean
+
+    DoctorPage:
+      allOf:
+        - $ref: '#/components/schemas/PageResponse'
+        - type: object
+          properties:
+            content:
+              type: array
+              items:
+                $ref: '#/components/schemas/DoctorResponse'
+
+    # ---------- Schedules and leaves ----------
+    ScheduleEntry:
+      type: object
+      required: [dayOfWeek, startTime, endTime]
+      properties:
+        dayOfWeek:
+          $ref: '#/components/schemas/DayOfWeek'
+        startTime:
+          type: string
+          pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$'
+          description: 24-hour HH:mm, clinic local time.
+          example: '09:00'
+        endTime:
+          type: string
+          pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$'
+          example: '13:00'
+
+    WeeklyScheduleRequest:
+      type: object
+      required: [entries]
+      properties:
+        entries:
+          type: array
+          maxItems: 28
+          items:
+            $ref: '#/components/schemas/ScheduleEntry'
+
+    WeeklyScheduleResponse:
+      type: object
+      required: [doctorId, entries]
+      properties:
+        doctorId:
+          type: string
+          format: uuid
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScheduleEntry'
+
+    LeaveRequest:
+      type: object
+      required: [startDate, endDate]
+      properties:
+        startDate:
+          type: string
+          format: date
+          example: '2026-11-20'
+        endDate:
+          type: string
+          format: date
+          description: Inclusive.
+          example: '2026-11-22'
+        reason:
+          type: string
+          maxLength: 255
+          example: Conference
+
+    LeaveResponse:
+      type: object
+      required: [id, doctorId, startDate, endDate, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        doctorId:
+          type: string
+          format: uuid
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        reason:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    # ---------- Patients ----------
+    PatientRequest:
+      type: object
+      description: |
+        Used for both create and update. `dateOfBirth`, `gender` and `phone`
+        are optional because self-registered patients start with an
+        incomplete profile.
+      required: [fullName, allergies]
+      properties:
+        fullName:
+          type: string
+          minLength: 2
+          maxLength: 100
+        dateOfBirth:
+          type: string
+          format: date
+          description: Must not be in the future.
+          example: '1994-06-15'
+        gender:
+          $ref: '#/components/schemas/Gender'
+        phone:
+          type: string
+          pattern: '^\+?[0-9]{10,15}$'
+          description: Not unique; family members may share a number.
+        email:
+          type: string
+          format: email
+          maxLength: 254
+        address:
+          type: string
+          maxLength: 500
+        allergies:
+          type: array
+          maxItems: 50
+          items:
+            type: string
+            minLength: 1
+            maxLength: 100
+          example: [Penicillin, Peanuts]
+
+    PatientResponse:
+      type: object
+      required: [id, fullName, allergies, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Patient profile id (not the user id).
+        userId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Null for walk-in patients with no login account.
+        fullName:
+          type: string
+        dateOfBirth:
+          type: string
+          format: date
+          nullable: true
+        gender:
+          allOf:
+            - $ref: '#/components/schemas/Gender'
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        email:
+          type: string
+          format: email
+          nullable: true
+        address:
+          type: string
+          nullable: true
+        allergies:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    PatientSummary:
+      type: object
+      required: [id, fullName]
+      properties:
+        id:
+          type: string
+          format: uuid
+        fullName:
+          type: string
+        phone:
+          type: string
+          nullable: true
+        dateOfBirth:
+          type: string
+          format: date
+          nullable: true
+        gender:
+          allOf:
+            - $ref: '#/components/schemas/Gender'
+          nullable: true
+
+    PatientPage:
+      allOf:
+        - $ref: '#/components/schemas/PageResponse'
+        - type: object
+          properties:
+            content:
+              type: array
+              items:
+                $ref: '#/components/schemas/PatientSummary'
+
+    # ---------- Reference data (part 3) ----------
+    SpecializationResponse:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: Cardiology
+
+    ClinicResponse:
+      type: object
+      required: [id, name, timeZone]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          example: CareSync Banjara Hills
+        address:
+          type: string
+          nullable: true
+        timeZone:
+          type: string
+          description: IANA time zone id. Slots, schedules and leaves are interpreted in it.
+          example: Asia/Kolkata
+
+    # ---------- Slots ----------
+    SlotClosedReason:
+      type: string
+      description: |
+        Why a whole day has no slots. If several apply, the first in this
+        order is reported: DOCTOR_INACTIVE, OUTSIDE_BOOKING_WINDOW,
+        ON_LEAVE, NO_SCHEDULE.
+      enum: [DOCTOR_INACTIVE, OUTSIDE_BOOKING_WINDOW, ON_LEAVE, NO_SCHEDULE]
+
+    SlotResponse:
+      type: object
+      required: [start, end, available]
+      properties:
+        start:
+          type: string
+          format: date-time
+          description: UTC. Send this value as `slotStart` when booking.
+          example: '2026-11-12T03:30:00Z'
+        end:
+          type: string
+          format: date-time
+          example: '2026-11-12T03:45:00Z'
+        available:
+          type: boolean
+
+    SlotListResponse:
+      type: object
+      required: [doctorId, clinicId, timeZone, date, slotMinutes, closedReason, slots]
+      properties:
+        doctorId:
+          type: string
+          format: uuid
+        clinicId:
+          type: string
+          format: uuid
+        timeZone:
+          type: string
+          example: Asia/Kolkata
+        date:
+          type: string
+          format: date
+          description: The clinic-local date that was requested.
+          example: '2026-11-12'
+        slotMinutes:
+          type: integer
+          example: 15
+        closedReason:
+          allOf:
+            - $ref: '#/components/schemas/SlotClosedReason'
+          nullable: true
+          description: Null when the day is open.
+        slots:
+          type: array
+          items:
+            $ref: '#/components/schemas/SlotResponse'
+
+    # ---------- Appointments ----------
+    AppointmentCreateRequest:
+      type: object
+      required: [doctorId, patientId, slotStart]
+      properties:
+        doctorId:
+          type: string
+          format: uuid
+        patientId:
+          type: string
+          format: uuid
+          description: Patient profile id. PATIENT callers must send their own.
+        slotStart:
+          type: string
+          format: date-time
+          description: UTC start of a slot returned by the slots endpoint.
+          example: '2026-11-12T03:30:00Z'
+        reason:
+          type: string
+          maxLength: 500
+          example: Chest discomfort for two days
+
+    AppointmentStatusUpdateRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          $ref: '#/components/schemas/AppointmentStatus'
+        reason:
+          type: string
+          maxLength: 500
+          description: Used only when `status` is CANCELLED.
+
+    AppointmentResponse:
+      type: object
+      required: [id, doctorId, doctorName, patientId, patientName, clinicId, timeZone, slotStart, slotEnd, status, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        doctorId:
+          type: string
+          format: uuid
+        doctorName:
+          type: string
+        patientId:
+          type: string
+          format: uuid
+        patientName:
+          type: string
+        clinicId:
+          type: string
+          format: uuid
+        timeZone:
+          type: string
+          description: Clinic IANA time zone, for display.
+          example: Asia/Kolkata
+        slotStart:
+          type: string
+          format: date-time
+          example: '2026-11-12T03:30:00Z'
+        slotEnd:
+          type: string
+          format: date-time
+          example: '2026-11-12T03:45:00Z'
+        status:
+          $ref: '#/components/schemas/AppointmentStatus'
+        reason:
+          type: string
+          nullable: true
+        cancellationReason:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    AppointmentPage:
+      allOf:
+        - $ref: '#/components/schemas/PageResponse'
+        - type: object
+          properties:
+            content:
+              type: array
+              items:
+                $ref: '#/components/schemas/AppointmentResponse' 
+
+    # ---------- Consultations (part 4) ----------
+    Vitals:
+      type: object
+      description: All fields are optional.
+      properties:
+        bloodPressure:
+          type: string
+          pattern: '^[0-9]{2,3}/[0-9]{2,3}$'
+          description: Systolic/diastolic in mmHg.
+          example: '120/80'
+        pulse:
+          type: integer
+          minimum: 20
+          maximum: 300
+          description: Beats per minute.
+          example: 72
+        temperature:
+          type: number
+          minimum: 30
+          maximum: 45
+          description: Degrees Celsius.
+          example: 36.8
+        weightKg:
+          type: number
+          minimum: 0.5
+          maximum: 500
+          example: 68.5
+        spo2:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Oxygen saturation in percent.
+          example: 98
+
+    ConsultationRequest:
+      type: object
+      description: |
+        Used for both create and update. Every field is optional so a doctor
+        can save a draft. To complete the appointment a non-blank `diagnosis`
+        is required.
+      properties:
+        vitals:
+          $ref: '#/components/schemas/Vitals'
+        symptoms:
+          type: string
+          maxLength: 2000
+          example: Chest discomfort for two days
+        diagnosis:
+          type: string
+          maxLength: 2000
+          example: Stable angina
+        notes:
+          type: string
+          maxLength: 5000
+        followUpDate:
+          type: string
+          format: date
+          description: Clinic-local date. Must not be before today in the clinic's time zone.
+          example: '2026-11-24'
+
+    ConsultationResponse:
+      type: object
+      required: [id, appointmentId, patientId, patientName, doctorId, doctorName, finalized, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        appointmentId:
+          type: string
+          format: uuid
+        patientId:
+          type: string
+          format: uuid
+        patientName:
+          type: string
+        doctorId:
+          type: string
+          format: uuid
+        doctorName:
+          type: string
+        vitals:
+          allOf:
+            - $ref: '#/components/schemas/Vitals'
+          nullable: true
+        symptoms:
+          type: string
+          nullable: true
+        diagnosis:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        followUpDate:
+          type: string
+          format: date
+          nullable: true
+        finalized:
+          type: boolean
+          description: True once the appointment is COMPLETED. A finalized consultation is read-only.
+        finalizedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    # ---------- Medicines ----------
+    MedicineForm:
+      type: string
+      enum: [TABLET, CAPSULE, SYRUP, INJECTION, CREAM, DROPS, INHALER, OTHER]
+
+    MedicineResponse:
+      type: object
+      required: [id, name, genericName, strength, form]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+          description: Brand or catalog name.
+          example: Augmentin 625
+        genericName:
+          type: string
+          example: Amoxicillin + Clavulanic acid
+        strength:
+          type: string
+          example: 500 mg + 125 mg
+        form:
+          $ref: '#/components/schemas/MedicineForm'
+        drugClass:
+          type: string
+          nullable: true
+          description: Used for allergy matching.
+          example: Penicillin
+
+    MedicinePage:
+      allOf:
+        - $ref: '#/components/schemas/PageResponse'
+        - type: object
+          properties:
+            content:
+              type: array
+              items:
+                $ref: '#/components/schemas/MedicineResponse'
+
+    # ---------- Prescription safety check ----------
+    WarningType:
+      type: string
+      enum: [ALLERGY, INTERACTION]
+
+    WarningSeverity:
+      type: string
+      enum: [MILD, MODERATE, SEVERE]
+
+    MedicineRef:
+      type: object
+      required: [id, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+
+    PrescriptionWarning:
+      type: object
+      required: [type, severity, medicines, message]
+      properties:
+        type:
+          $ref: '#/components/schemas/WarningType'
+        severity:
+          $ref: '#/components/schemas/WarningSeverity'
+        medicines:
+          type: array
+          minItems: 1
+          maxItems: 2
+          description: One medicine for ALLERGY, two for INTERACTION.
+          items:
+            $ref: '#/components/schemas/MedicineRef'
+        message:
+          type: string
+          example: Patient is allergic to penicillin and this medicine belongs to that class.
+
+    PrescriptionCheckRequest:
+      type: object
+      required: [patientId, medicineIds]
+      properties:
+        patientId:
+          type: string
+          format: uuid
+        medicineIds:
+          type: array
+          minItems: 1
+          maxItems: 20
+          uniqueItems: true
+          items:
+            type: string
+            format: uuid
+
+    PrescriptionCheckResponse:
+      type: object
+      required: [warnings]
+      properties:
+        warnings:
+          type: array
+          items:
+            $ref: '#/components/schemas/PrescriptionWarning'
+
+    # ---------- Prescriptions ----------
+    PrescriptionItemRequest:
+      type: object
+      required: [medicineId, dosage, frequency, durationDays]
+      properties:
+        medicineId:
+          type: string
+          format: uuid
+        dosage:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Free text.
+          example: 500 mg
+        frequency:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Free text, for example 1-0-1 or twice daily.
+          example: 1-0-1
+        durationDays:
+          type: integer
+          minimum: 1
+          maximum: 365
+          example: 5
+        instructions:
+          type: string
+          maxLength: 500
+          example: Take after food
+
+    PrescriptionCreateRequest:
+      type: object
+      required: [consultationId, items]
+      properties:
+        consultationId:
+          type: string
+          format: uuid
+        items:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            $ref: '#/components/schemas/PrescriptionItemRequest'
+        acknowledgeSevereWarnings:
+          type: boolean
+          default: false
+          description: Must be true to save a prescription that has a SEVERE warning.
+
+    PrescriptionItemResponse:
+      type: object
+      required: [medicine, dosage, frequency, durationDays]
+      properties:
+        medicine:
+          $ref: '#/components/schemas/MedicineResponse'
+        dosage:
+          type: string
+        frequency:
+          type: string
+        durationDays:
+          type: integer
+        instructions:
+          type: string
+          nullable: true
+
+    PrescriptionResponse:
+      type: object
+      required: [id, consultationId, appointmentId, patientId, patientName, doctorId, doctorName, items, warnings, severeWarningsAcknowledged, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        consultationId:
+          type: string
+          format: uuid
+        appointmentId:
+          type: string
+          format: uuid
+        patientId:
+          type: string
+          format: uuid
+        patientName:
+          type: string
+        doctorId:
+          type: string
+          format: uuid
+        doctorName:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PrescriptionItemResponse'
+        warnings:
+          type: array
+          description: Warnings found when the prescription was created.
+          items:
+            $ref: '#/components/schemas/PrescriptionWarning'
+        severeWarningsAcknowledged:
+          type: boolean
+          description: True only when a SEVERE warning existed and the doctor acknowledged it.
+        createdAt:
+          type: string
+          format: date-time
+
+    PrescriptionPage:
+      allOf:
+        - $ref: '#/components/schemas/PageResponse'
+        - type: object
+          properties:
+            content:
+              type: array
+              items:
+                $ref: '#/components/schemas/PrescriptionResponse'   
+
+    # ---------- Money (part 4b) ----------
+    Money:
+      type: string
+      pattern: '^(0|[1-9][0-9]{0,9})\.[0-9]{2}$'
+      description: |
+        Amount in INR as a decimal string with exactly two decimals, for
+        example "1500.00". Always a string, never a JSON number, so binary
+        floating point cannot change the value. Parse it with a decimal
+        library, not parseFloat.
+      example: '1500.00'
+
+    Currency:
+      type: string
+      enum: [INR]
+      description: ISO 4217 currency code. INR is the only supported value.
+
+    # ---------- Invoices ----------
+    InvoiceItemRequest:
+      type: object
+      required: [description, quantity, unitPrice]
+      properties:
+        description:
+          type: string
+          minLength: 1
+          maxLength: 200
+          example: ECG
+        quantity:
+          type: integer
+          minimum: 1
+          maximum: 100
+          example: 1
+        unitPrice:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          description: Must be greater than 0.00.
+          example: '350.00'
+
+    InvoiceItemResponse:
+      type: object
+      required: [id, description, quantity, unitPrice, lineTotal, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        description:
+          type: string
+        quantity:
+          type: integer
+        unitPrice:
+          $ref: '#/components/schemas/Money'
+        lineTotal:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          description: quantity times unitPrice, computed by the server.
+        createdAt:
+          type: string
+          format: date-time
+
+    PaymentRequest:
+      type: object
+      required: [amount, method]
+      properties:
+        amount:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          description: Must be greater than 0.00 and at most the invoice balance.
+          example: '500.00'
+        method:
+          $ref: '#/components/schemas/PaymentMethod'
+        txnRef:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Required for CARD, UPI and NET_BANKING. Optional for CASH.
+          example: UPI-9876543210
+
+    PaymentResponse:
+      type: object
+      required: [id, invoiceId, amount, currency, method, receivedBy, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        invoiceId:
+          type: string
+          format: uuid
+        amount:
+          $ref: '#/components/schemas/Money'
+        currency:
+          $ref: '#/components/schemas/Currency'
+        method:
+          $ref: '#/components/schemas/PaymentMethod'
+        txnRef:
+          type: string
+          nullable: true
+        receivedBy:
+          type: string
+          description: Full name of the staff member who recorded the payment.
+        createdAt:
+          type: string
+          format: date-time
+
+    CreditNoteRequest:
+      type: object
+      required: [amount, reason]
+      properties:
+        amount:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          description: Must be greater than 0.00.
+          example: '200.00'
+        reason:
+          type: string
+          minLength: 5
+          maxLength: 500
+          example: Duplicate ECG charged by mistake
+
+    CreditNoteResponse:
+      type: object
+      required: [id, creditNoteNumber, invoiceId, amount, currency, reason, createdBy, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        creditNoteNumber:
+          type: string
+          description: Human-readable number, unique and generated by the server.
+          example: CN-2026-000007
+        invoiceId:
+          type: string
+          format: uuid
+        amount:
+          $ref: '#/components/schemas/Money'
+        currency:
+          $ref: '#/components/schemas/Currency'
+        reason:
+          type: string
+        createdBy:
+          type: string
+          description: Full name of the Admin who issued it.
+        createdAt:
+          type: string
+          format: date-time
+
+    InvoiceSummary:
+      type: object
+      required: [id, invoiceNumber, appointmentId, patientId, patientName, doctorName, status, currency, total, amountPaid, balance, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        invoiceNumber:
+          type: string
+          description: Human-readable number, unique and generated by the server.
+          example: INV-2026-000123
+        appointmentId:
+          type: string
+          format: uuid
+        patientId:
+          type: string
+          format: uuid
+        patientName:
+          type: string
+        doctorName:
+          type: string
+        status:
+          $ref: '#/components/schemas/InvoiceStatus'
+        currency:
+          $ref: '#/components/schemas/Currency'
+        total:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          description: Sum of all line totals.
+        amountPaid:
+          $ref: '#/components/schemas/Money'
+        balance:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          description: total minus amountPaid.
+        createdAt:
+          type: string
+          format: date-time
+        paidAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Set when the status becomes PAID.
+
+    InvoiceResponse:
+      allOf:
+        - $ref: '#/components/schemas/InvoiceSummary'
+        - type: object
+          required: [doctorId, clinicId, items, payments, creditNotes, creditedTotal, netTotal, updatedAt]
+          properties:
+            doctorId:
+              type: string
+              format: uuid
+            clinicId:
+              type: string
+              format: uuid
+            items:
+              type: array
+              description: The first item is the consultation fee copied from the doctor when the appointment was completed.
+              items:
+                $ref: '#/components/schemas/InvoiceItemResponse'
+            payments:
+              type: array
+              description: Oldest first.
+              items:
+                $ref: '#/components/schemas/PaymentResponse'
+            creditNotes:
+              type: array
+              description: Oldest first.
+              items:
+                $ref: '#/components/schemas/CreditNoteResponse'
+            creditedTotal:
+              allOf:
+                - $ref: '#/components/schemas/Money'
+              description: Sum of all credit notes.
+            netTotal:
+              allOf:
+                - $ref: '#/components/schemas/Money'
+              description: total minus creditedTotal.
+            updatedAt:
+              type: string
+              format: date-time
+
+    InvoicePage:
+      allOf:
+        - $ref: '#/components/schemas/PageResponse'
+        - type: object
+          properties:
+            content:
+              type: array
+              items:
+                $ref: '#/components/schemas/InvoiceSummary'                              
   responses:
     BadRequest:
       description: Validation failed or the request body is malformed.
@@ -390,6 +3006,15 @@ components:
                 message: Request body is missing or malformed
                 path: /api/auth/login
                 fieldErrors: []
+            overpayment:
+              summary: Payment is more than the invoice balance
+              value:
+                timestamp: '2026-11-10T09:30:00Z'
+                status: 400
+                code: OVERPAYMENT
+                message: Payment of 800.00 is more than the balance of 500.00
+                path: /api/invoices/9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d/payments
+                fieldErrors: []    
 
     Unauthorized:
       description: |
@@ -482,3 +3107,48 @@ components:
                 message: This slot is already booked
                 path: /api/appointments
                 fieldErrors: []
+            illegalStateTransition:
+              summary: Transition not allowed from the current status
+              value:
+                timestamp: '2026-11-10T09:30:00Z'
+                status: 409
+                code: ILLEGAL_STATE_TRANSITION
+                message: Cannot move an appointment from COMPLETED to CANCELLED
+                path: /api/appointments/7c9e6679-7425-40de-944b-e07fc1f90ae7/status
+                fieldErrors: []
+            cancellationWindowClosed:
+              summary: Less than 2 hours before the slot
+              value:
+                timestamp: '2026-11-10T09:30:00Z'
+                status: 409
+                code: CANCELLATION_WINDOW_CLOSED
+                message: Appointments can only be cancelled at least 2 hours before the slot
+                path: /api/appointments/7c9e6679-7425-40de-944b-e07fc1f90ae7/status
+                fieldErrors: []
+            severeWarningNotAcknowledged:
+              summary: Severe warning found and not acknowledged
+              value:
+                timestamp: '2026-11-10T09:30:00Z'
+                status: 409
+                code: SEVERE_WARNING_NOT_ACKNOWLEDGED
+                message: A severe warning exists. Review it and resend with acknowledgeSevereWarnings set to true
+                path: /api/prescriptions
+                fieldErrors: []
+            consultationFinalized:
+              summary: Consultation can no longer be changed
+              value:
+                timestamp: '2026-11-10T09:30:00Z'
+                status: 409
+                code: CONSULTATION_FINALIZED
+                message: This consultation is finalized and cannot be changed
+                path: /api/consultations/5d0f3c1e-9a7b-4c52-8e61-2b4f7a9c1d30
+                fieldErrors: []
+            invoiceImmutable:
+              summary: Invoice is PAID and cannot be changed
+              value:
+                timestamp: '2026-11-10T09:30:00Z'
+                status: 409
+                code: INVOICE_IMMUTABLE
+                message: A paid invoice cannot be changed. Issue a credit note to correct it
+                path: /api/invoices/9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d/items
+                fieldErrors: []        
