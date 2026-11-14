@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+    "jsx": "react-jsx",
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true
+  },
+  "include": ["src", "vite.config.js"]
+}
