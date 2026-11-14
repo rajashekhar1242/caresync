@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: caresync-postgres
+    environment:
+      POSTGRES_DB: ${CARESYNC_DB_NAME:-caresync}
+      POSTGRES_USER: ${CARESYNC_DB_USER:-caresync}
+      POSTGRES_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:?Set SPRING_DATASOURCE_PASSWORD in environment or .env}
+    ports:
+      - "5432:5432"
+    volumes:
+      - caresync_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${CARESYNC_DB_USER:-caresync} -d ${CARESYNC_DB_NAME:-caresync}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  caresync_pgdata:
