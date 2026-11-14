@@ -1,0 +1,36 @@
+spring:
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+    validate-on-migrate: true
+
+caresync:
+  jwt:
+    secret: ${CARESYNC_TEST_JWT_SECRET:dGVzdC1vbmx5LWp3dC1zZWNyZXQta2V5LWF0LWxlYXN0LTMyLWJ5dGVzLWZvci10ZXN0cw==}
+    access-token-expiry-seconds: 900
+    refresh-token-expiry-seconds: 604800
+  cors:
+    allowed-origins: http://localhost:3000,http://localhost:5173,https://test.pages.dev
+  rate-limit:
+    register-per-minute: 5
+    login-per-minute: 10
+    refresh-per-minute: 20
+    board-per-minute: 30
+  reporting:
+    time-zone: Asia/Kolkata
+  bootstrap:
+    admin:
+      email: admin-test@caresync.local
+      password: TestAdmin!Password123
+    receptionist:
+      email: reception-test@caresync.local
+      password: TestReception!Password123
+
+logging:
+  level:
+    com.caresync: INFO
+    SECURITY_EVENTS: INFO
+    org.testcontainers: INFO
