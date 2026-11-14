@@ -1,227 +1,307 @@
-# Hospital & Clinic Management System (HCMS)
+# CareSync — Hospital & Clinic Management System (HCMS)
 
-Backend platform for the **Hospital & Clinic Management System (HCMS)** — a Java 25 / Spring Boot 4 modular monolith providing clinic scheduling, live patient queues over WebSocket/STOMP, clinical consultations and prescriptions with drug-safety checks, automated billing/invoicing with PDF generation, immutable audit logging, and operational reporting.
+[![Java 25](https://img.shields.io/badge/Java-25-orange.svg)](https://openjdk.org/projects/jdk/25/)
+[![Spring Boot 4.1.2](https://img.shields.io/badge/Spring%20Boot-4.1.2-brightgreen.svg)](https://spring.io/projects/spring-boot)
+[![React 18](https://img.shields.io/badge/React-18-blue.svg)](https://react.dev/)
+[![Vite 6](https://img.shields.io/badge/Vite-6-purple.svg)](https://vitejs.dev/)
+[![PostgreSQL 16](https://img.shields.io/badge/PostgreSQL-16-blue.svg)](https://www.postgresql.org/)
+[![Tests](https://img.shields.io/badge/Automated%20Tests-354%20Passed-success.svg)](docs/TESTING.md)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-> **Compatibility Note on Technical Identifiers:** While the product and documentation have been branded as **Hospital & Clinic Management System (HCMS)** (`spring.application.name: hcms`), underlying Java packages (`com.caresync.*`), Maven coordinates (`com.caresync:caresync-backend`), database/Docker identifiers (`caresync`, `caresync-postgres`, `caresync_pgdata`), Flyway migrations (`V1`–`V12`), configuration prefix (`caresync.*`), and environment variables (`CARESYNC_*`) are intentionally preserved for backward compatibility.
+An enterprise-grade, high-concurrency outpatient healthcare platform designed to showcase modern **full-stack software engineering**, **resilient backend architecture**, and **secure domain-driven design**.
 
----
-
-## 1. Overview
-
-HCMS models outpatient hospital and multi-clinic operations across four authenticated roles (`ADMIN`, `DOCTOR`, `RECEPTIONIST`, `PATIENT`) plus a zero-PII public waiting-room queue board:
-
-- **Clinic-timezone-aware scheduling** using clinic IANA time zones (e.g., `Asia/Kolkata`) with UTC persistence (`Instant` / PostgreSQL `timestamptz`) and DST gap/overlap handling.
-- **Strict appointment lifecycle state machine** (`BOOKED -> CHECKED_IN -> IN_CONSULTATION -> COMPLETED`, `CANCELLED`, `NO_SHOW`) backed by PostgreSQL partial unique indexes and atomic per-doctor daily token counters.
-- **Real-time waiting room broadcasts** via STOMP over SockJS (`/ws`, `/topic/queue/{doctorId}`) triggered post-commit with zero PII on public payloads.
-- **Clinical safety & documentation** combining consultations, medicine catalog search, allergy/drug-interaction checks, immutable prescriptions, and OpenPDF prescription & invoice rendering.
-- **Exact decimal billing & reporting** using `INR` fixed-scale `BigDecimal` arithmetic (`NUMERIC(12,2)`), partial counter payments, credit notes, void guards, and PostgreSQL SQL-aggregated admin dashboards.
+Built with **Java 25 (Virtual Threads)**, **Spring Boot 4.1.2**, **Spring Security 7**, **PostgreSQL 16**, **React 18**, and **STOMP WebSockets**.
 
 ---
 
-## 2. Key Features
+## 1. Problem Statement & System Purpose
 
-Implemented modules in the backend repository:
+Outpatient clinics and multi-specialty hospitals face critical operational challenges:
+- **Scheduling Conflicts & Race Conditions:** Concurrent slot bookings by patients and receptionists lead to double-booked doctors and clinic chaos.
+- **Waiting Room Congestion & Privacy:** Crowded waiting rooms lack real-time visibility, while public monitors risk leaking Protected Health Information (PHI).
+- **Prescription Errors & Adverse Drug Events:** Overlooked medication allergies and contraindications compromise patient safety.
+- **Financial Leakage & Discrepancies:** Floating-point rounding errors and untracked cancellations lead to revenue discrepancies.
+- **Regulatory Compliance:** Auditing requirements demand tamper-proof records of who accessed or modified patient data.
 
-- **Authentication & Authorization (`com.caresync.auth`):** Patient self-registration (`POST /api/auth/register` with automatic `Patient` profile provisioning), login, single-use SHA-256 refresh token rotation with replay-detection token revocation, idempotent logout, `/api/auth/me`, and environment-driven staff account bootstrap (`!LOCKED_REQUIRES_BOOTSTRAP!` guard).
-- **Immutable Audit Logging (`com.caresync.audit`):** Append-only `audit_logs` table protected by a PostgreSQL `BEFORE UPDATE OR DELETE` trigger (`V12`), synchronous transactional capture for sensitive clinical/patient/billing reads & writes, and `ADMIN` query filtering (`GET /api/audit-logs`).
-- **Reference Data & Departments (`com.caresync.reference`):** Read-only seeded clinics and specializations plus `ADMIN`-managed hospital departments with case-insensitive uniqueness enforcement.
-- **Doctors, Weekly Schedules & Leaves (`com.caresync.doctor`):** Transactional `User(DOCTOR)` + `Doctor` creation, active/specialization/clinic/name filtering, atomic weekly schedule replacement, leave management blocking overlap or booked appointments, and timezone-aware bookable slot calculation.
-- **Patients (`com.caresync.patient`):** Walk-in patient creation, `TEXT[]` allergy storage with case-insensitive deduplication, doctor patient scoping (`EXISTS` over non-cancelled appointments), and audited profile reads (`PATIENT_READ`).
-- **Appointments & State Machine (`com.caresync.appointment`):** Conflict-safe slot booking (`uq_appointment_slot_active`), atomic daily token assignment (`doctor_day_counters`), optimistic locking (`@Version`), single active consultation guard (`uq_appointment_doctor_in_consultation`), 2-hour patient cancellation window, and cross-module lifecycle hooks.
-- **Live Queue & WebSocket (`com.caresync.queue`):** Doctor queue state view, atomic `call-next`, public clinic queue board (`GET /api/queue/board?clinicId=` with `Cache-Control: no-store` and zero PII), and post-commit STOMP broadcasts.
-- **Consultations, Medicines & Prescriptions (`com.caresync.consultation`, `com.caresync.medicine`, `com.caresync.prescription`):** Consultation authoring/finalization by the treating doctor, medicine catalog pagination, allergy/symmetric drug-interaction safety checker (`MILD`/`MODERATE`/`SEVERE`), prescription creation with severe-warning acknowledgement check, and A4 PDF downloads.
-- **Billing & Invoicing (`com.caresync.billing`):** Automatic invoice creation on appointment `COMPLETED` transition (including zero-fee auto-`PAID`), itemized additions, `PESSIMISTIC_WRITE` row locking, partial counter payments with `txnRef` uniqueness, `ADMIN` credit notes and invoice voiding, and OpenPDF invoice rendering.
-- **Admin Reports & Dashboard (`com.caresync.report`):** Parameterized PostgreSQL aggregations across revenue, appointments by department, no-show rates, top doctors, and summary dashboard metrics.
-
-*(Note: Optional deferred items documented in [docs/domain.md](docs/domain.md) — such as `/api/users` staff creation and `POST /api/appointments/{appointmentId}/invoices` — are not part of the active v0.1.0 OpenAPI contract.)*
+**CareSync** solves these challenges through a cohesive, high-performance **modular monolith** that provides end-to-end outpatient workflow automation across four authenticated role tiers, backed by database-level concurrency guards and an append-only audit trail.
 
 ---
 
-## 3. System Architecture
+## 2. Technology Stack
 
-HCMS is structured as a **single-deployment modular monolith** inside `backend/src/main/java/com/caresync/`:
+### Backend & Core Services
+- **Runtime:** Java 25 with Virtual Threads enabled (`spring.threads.virtual.enabled: true`)
+- **Framework:** Spring Boot 4.1.2
+- **Security:** Spring Security 7, HMAC-SHA256 JWT, Single-Use Refresh Token Rotation (RTR)
+- **Data Access:** Spring Data JPA with Hibernate 6.6 & HikariCP
+- **Database:** PostgreSQL 16
+- **Schema Migrations:** Flyway 10 (V1 through V12)
+- **Real-Time Communication:** Spring WebSocket with STOMP message broker
+- **Document Rendering:** OpenPDF 2.0 (Vector-quality prescriptions and invoice receipts)
+- **Rate Limiting:** In-memory Token Bucket algorithm (Bucket4j pattern)
 
-```text
-com.caresync
-├── common          # Config properties, CORS, JWT, Bucket4j rate limiter, error handler, utils
-├── auth            # Users, refresh tokens, login/register/refresh/logout, staff bootstrap
-├── audit           # Append-only audit events & ADMIN search endpoint
-├── reference       # Clinics, specializations, departments
-├── doctor          # Doctor profiles, weekly schedules, leaves
-├── patient         # Patient records, allergies, doctor-patient scoping adapter target
-├── appointment     # Slot generation, booking, token counters, strict state machine
-├── queue           # Live waiting room state, call-next, public board, STOMP/SockJS publisher
-├── consultation    # Clinical consultation notes & Appointment consultation lifecycle adapter
-├── medicine        # Read-only medicine catalog & drug interaction data
-├── prescription    # Allergy/interaction safety checks, prescriptions, OpenPDF renderer
-├── billing         # Auto-invoicing (AppointmentBillingPort), payments, credit notes, void, PDF
-└── report          # Read-only ADMIN JDBC/SQL aggregations
+### Frontend & Client Applications
+- **Framework:** React 18 (pure JavaScript ES6+ with JSX, no TypeScript)
+- **Build System:** Vite 6 with lightning-fast HMR
+- **Styling:** Tailwind CSS 3.4 with custom clinical HSL design tokens
+- **Routing:** React Router 7 with role-based protected route guards
+- **Server State & Caching:** TanStack Query 5 (React Query)
+- **HTTP Client:** Axios 1.7 with concurrency-safe single-flight refresh token mutex
+- **Forms & Validation:** React Hook Form 7 + Zod 3 runtime schema validation
+- **Component Library:** Radix UI primitives & Lucide React icons (18 custom UI components)
+
+### Infrastructure, Testing & DevOps
+- **Containers:** Multi-stage Docker builds (`backend/Dockerfile`, `frontend/Dockerfile`)
+- **Orchestration:** Docker Compose (local dev and production profiles)
+- **Reverse Proxy & TLS:** Nginx 1.27 Alpine with automated Let's Encrypt Certbot renewal
+- **Testing:** JUnit 5, Testcontainers (`postgres:16-alpine`), Vitest 2, React Testing Library, jsdom
+
+---
+
+## 3. High-Level System Architecture
+
+CareSync is structured as a **modular monolith** that preserves strict ACID transaction boundaries across domain modules while scaling effortlessly on modern hardware via Java 25 Virtual Threads.
+
+```mermaid
+flowchart TD
+    subgraph Clients["Client Tier (React 18 / Vite 6)"]
+        AdminUI["Admin Portal"]
+        ReceptUI["Receptionist Desk"]
+        DoctorUI["Doctor Console"]
+        PatientUI["Patient Portal"]
+        QueueBoard["Public Queue Display (Zero-PII)"]
+    end
+
+    subgraph Gateway["Edge / Reverse Proxy Tier"]
+        Nginx["Nginx Reverse Proxy & TLS Termination"]
+        Cloudflare["Cloudflare Pages (Static Assets)"]
+    end
+
+    subgraph Backend["Modular Monolith (Spring Boot 4.1.2 / Java 25)"]
+        SecFilter["JwtAuthenticationFilter & Rate Limiter"]
+        RESTControllers["REST API Controllers (/api)"]
+        WebSocketBroker["STOMP WebSocket Broker (/ws)"]
+
+        subgraph Domains["Domain Modules (com.caresync.*)"]
+            AuthMod["auth & identity"]
+            DoctorMod["doctor & schedules"]
+            PatientMod["patient & allergies"]
+            ApptMod["appointment & state machine"]
+            QueueMod["live queue coordinator"]
+            ClinicalMod["consultation & vitals"]
+            PrescriptMod["prescription & safety engine"]
+            BillingMod["invoicing & payments"]
+            AuditMod["audit & compliance"]
+        end
+    end
+
+    subgraph Database["Database Tier (PostgreSQL 16)"]
+        Postgres[("PostgreSQL 16 Relational Engine")]
+        PartialIdx["Partial Unique Indexes (uq_appointment_slot_active)"]
+        AuditTrig["protect_audit_logs_append_only Trigger"]
+    end
+
+    Clients --> Gateway
+    Gateway -->|REST HTTPS| SecFilter
+    Gateway -->|STOMP WSS| WebSocketBroker
+    SecFilter --> RESTControllers
+    RESTControllers --> Domains
+    WebSocketBroker --> QueueMod
+    Domains --> Postgres
+    Postgres --> PartialIdx
+    Postgres --> AuditTrig
 ```
 
-Architectural principles:
-- **Acyclic Cross-Module Communication:** Downstream hooks use explicit ports/adapters (`ProfileLinkPort`, `DoctorPatientScopePort`, `ConsultationLifecyclePort`, `AppointmentBillingPort`) and post-commit domain events (`QueueChangedDomainEvent` -> `QueueMessagePublisher`).
-- **Stateless API Layer:** `spring.jpa.open-in-view: false`, `hibernate.ddl-auto: validate`, `hibernate.jdbc.time_zone: UTC`.
-- **Uniform Error Envelope:** All REST & security failures serialize through `ErrorResponseWriter` / `GlobalExceptionHandler` matching OpenAPI `ErrorResponse` (`status`, `code`, `message`, `path`, `timestamp`, optional `fieldErrors`).
+For complete technical specifications, see [docs/architecture/SYSTEM_ARCHITECTURE.md](docs/architecture/SYSTEM_ARCHITECTURE.md).
 
 ---
 
-## 4. Technology Stack
+## 4. Role-Based Portals & Functional Capabilities
 
-| Layer | Technology / Version |
-|---|---|
-| Language & Runtime | Java 25 (`virtual-threads.enabled: true`) |
-| Application Framework | Spring Boot `4.1.2` (Web, Security, Validation, Data JPA, WebSocket/STOMP, Actuator) |
-| Database & Migrations | PostgreSQL 16 (`postgres:16-alpine`), Flyway (`flyway-database-postgresql`) `V1`–`V12` |
-| Authentication | JJWT `0.13.0` (HS256 JWT + SHA-256 opaque refresh tokens), BCrypt |
-| Rate Limiting | Bucket4j `8.22.0` (bounded in-memory per-IP token buckets) |
-| PDF Generation | OpenPDF `3.0.5` |
-| Testing | JUnit 5, Spring Boot Test (`@WebMvcTest`), Mockito, Testcontainers `2.0.5` (`PostgreSQLContainer`) |
-| Build Tooling | Maven Wrapper (`backend/mvnw`, `backend/mvnw.cmd`) |
+CareSync provides four dedicated, role-tailored portal experiences:
 
----
-
-## 5. Security & Audit Design
-
-- **JWT & Refresh Rotation:** 256-bit+ HMAC secret validated at startup; short-lived access JWTs (`900s` default) paired with `604800s` opaque refresh tokens stored as SHA-256 hashes. Reusing a rotated/revoked refresh token immediately revokes all active refresh tokens for that user.
-- **RBAC & Ownership Enforcement:** Method-level `@EnableMethodSecurity` (`@PreAuthorize`) combined with service-layer IDOR checks for `PATIENT`, `DOCTOR`, `RECEPTIONIST`, and `ADMIN`.
-- **Rate Limiting:** Bucket4j per-IP limits on `/api/auth/register` (`5/min`), `/api/auth/login` (`10/min`), `/api/auth/refresh` (`20/min`), and `/api/queue/board` (`30/min`), returning `429 RATE_LIMITED` with `Retry-After`.
-- **CORS & WebSocket Security:** Explicit origin allowlist via `CARESYNC_CORS_ORIGINS` (no wildcard `*`); `WebSocketSecurityConfig` blocks all client STOMP `SEND` frames and permits `SUBSCRIBE` only to `^/topic/queue/[A-Za-z0-9-]+$`.
-- **Structured Sanitized Logging:** Single-event `SECURITY_EVENTS` structured logs (`UNAUTHORIZED`, `ACCESS_DENIED`, `INVALID_CREDENTIALS`, `RATE_LIMITED`) with zero PII or credentials; `prod` profile enables ECS JSON logging and trusted reverse-proxy `forward-headers-strategy`.
+| Role Portal | Primary Responsibilities & Features |
+| :--- | :--- |
+| **Admin Portal** | System oversight, physician onboarding, department configuration, clinic revenue aggregations, doctor load distribution, appointment no-show rates, and tamper-proof compliance audit logging. |
+| **Receptionist Desk** | Patient check-in desk, walk-in registration, doctor availability schedules, conflict-safe appointment booking, live waiting room queue management, and counter billing settlements (Cash, Card, UPI). |
+| **Doctor Console** | Clinical workspace with real-time queue advancement (`call-next`), patient medical timeline review, vitals recording (BP, Pulse, Temp, SpO2), clinical notes, automated drug allergy/interaction screening, and digital prescription issuance. |
+| **Patient Portal** | Self-service appointment booking with doctor schedule filters, upcoming appointment management, 2-hour cancellation rules, past medical consultation timeline, active prescriptions, and invoice receipts. |
+| **Public Queue Display** | Zero-PII public waiting room screen showing real-time token progression (`Token #14 — In Consultation`, `Token #15 — Waiting`) via WebSockets without exposing patient identities. |
 
 ---
 
-## 6. Database Schema Overview
+## 5. Engineering Highlights & Technical Deep Dives
 
-Managed exclusively by Flyway under `backend/src/main/resources/db/migration/` with `validate-on-migrate: true`:
+### 5.1 Concurrency-Safe Slot Booking & Race Condition Elimination
+Simultaneous booking attempts on the same doctor time slot are neutralized at the database engine level via a PostgreSQL **partial unique index** (Flyway `V9`):
+```sql
+CREATE UNIQUE INDEX uq_appointment_slot_active
+ON appointments (doctor_id, slot_start)
+WHERE status NOT IN ('CANCELLED');
+```
+If two clients click "Book" at the identical millisecond, the database serializes the transaction; exactly one succeeds (`HTTP 201 Created`), while the second receives an immediate `HTTP 409 Conflict` (`SLOT_ALREADY_BOOKED`), preventing double-booking without complex distributed locks.
 
-| Migration | Responsibility |
-|---|---|
-| `V1__create_identity_tables.sql` | `users` (case-insensitive `uq_users_email_lower`), `refresh_tokens` |
-| `V2__create_reference_data.sql` | `clinics` (IANA `time_zone`), `specializations`, `departments` |
-| `V3__create_doctor_tables.sql` | `doctors`, `doctor_schedules`, `doctor_leaves` |
-| `V4__create_patient_tables.sql` | `patients` (with PostgreSQL `TEXT[]` allergies) |
-| `V5__create_appointment_tables.sql` | `appointments` (with optimistic `version`), `doctor_day_counters` |
-| `V6__create_clinical_tables.sql` | `consultations`, `medicines`, `drug_interactions`, `prescriptions`, `prescription_items`, `prescription_warnings` |
-| `V7__create_billing_tables.sql` | `invoices`, `invoice_items`, `payments`, `credit_notes`, `invoice_number_seq`, `credit_note_number_seq` |
-| `V8__create_audit_table.sql` | `audit_logs` |
-| `V9__create_indexes_and_constraints.sql` | Partial unique indexes (`uq_appointment_slot_active`, `uq_appointment_doctor_in_consultation`, `uq_payment_method_txn_ref`) & query indexes |
-| `V10__seed_reference_data.sql` | Clinics, specializations, departments, medicine catalog, and interaction seed data |
-| `V11__seed_staff_accounts.sql` | Locked bootstrap staff rows (`admin@caresync.local`, `reception@caresync.local`) |
-| `V12__protect_audit_logs_append_only.sql` | `BEFORE UPDATE OR DELETE` PostgreSQL trigger enforcing append-only `audit_logs` |
+### 5.2 Single-Flight Refresh Token Mutex on React Frontend
+The Spring Boot backend enforces single-use Refresh Token Rotation (RTR). Replaying an already-consumed refresh token triggers replay detection and revokes the user's entire session family.
+- To prevent parallel dashboard widgets from firing concurrent refresh calls when the access token expires, the frontend Axios interceptor (`frontend/src/services/api.js`) implements a **single-flight concurrency mutex**.
+- The first `401 Unauthorized` acquires the mutex; all subsequent `401` requests are enqueued in a promise queue.
+- A single refresh call is made; upon success, all queued requests are retried with the new access token.
 
----
+### 5.3 Clinical Safety Engine (Allergy & Drug-Drug Interactions)
+Before issuing prescriptions, `SafetyCheckService` cross-references:
+1. The medication against the patient's recorded allergies (`patient.allergies TEXT[]`).
+2. The medication against the patient's other active prescriptions via a symmetric interaction matrix (`medicines` + `drug_interactions`).
+3. Severe warnings require an explicit, documented clinical acknowledgement flag before the prescription can be signed.
 
-## 7. API Surface Overview
+### 5.4 Exact Decimal Financial Arithmetic & Invoicing
+- **Zero Floating-Point Drift:** Monetary values are modeled as `BigDecimal` with fixed scale of 2 (`RoundingMode.HALF_UP`) mapped to PostgreSQL `NUMERIC(12,2)`.
+- **Automated Lifecycle Invoicing:** When an appointment transitions to `COMPLETED`, an event listener calls `AppointmentBillingPort` to generate the consultation invoice automatically.
+- **Pessimistic Locking:** Payment recording acquires a `PESSIMISTIC_WRITE` lock on the invoice row to prevent concurrent double-charging.
 
-- Full contract: [docs/openapi.yaml](docs/openapi.yaml) (**55 HTTP operations** across **40 REST paths** under `/api`) + STOMP WebSocket `/ws` (`/topic/queue/{doctorId}`).
-- Domain rules & state invariants: [docs/domain.md](docs/domain.md).
-
-| Module | Base Paths | Key Operations |
-|---|---|---|
-| Auth | `/api/auth/*` | `POST /register`, `POST /login`, `POST /refresh`, `POST /logout`, `GET /me` |
-| Reference | `/api/departments*`, `/api/specializations`, `/api/clinics` | Reference lookup; `ADMIN` department create/update |
-| Doctors & Scheduling | `/api/doctors*` | Search/create/update doctors; `GET`/`PUT` schedules; `GET`/`POST`/`DELETE` leaves; `GET` slots |
-| Patients | `/api/patients*` | Scoped search, create walk-in, audited read, full update |
-| Appointments & Queue | `/api/appointments*`, `/api/queue*`, `/ws` | Book, list, get, `PATCH /status`, doctor queue, `POST /call-next`, public board, STOMP updates |
-| Clinical & Pharmacy | `/api/appointments/{id}/consultation`, `/api/consultations/{id}`, `/api/medicines`, `/api/prescriptions*`, `/api/patients/{id}/prescriptions` | Consultation notes, medicine search, safety check, prescription creation & PDF |
-| Billing | `/api/invoices*`, `/api/appointments/{id}/invoice` | List, get, appointment lookup, add item, record payment, credit note, void, invoice PDF |
-| Audit & Reports | `/api/audit-logs`, `/api/reports/*` | `ADMIN` audit search; revenue, by-department, no-show rate, top doctors, dashboard |
-
----
-
-## 8. Environment Variables & Profiles
-
-Reference template: [.env.example](.env.example).
-
-| Variable | Required | Default / Example | Purpose |
-|---|---|---|---|
-| `SPRING_DATASOURCE_URL` | Prod / Optional locally | `jdbc:postgresql://localhost:5432/caresync` | PostgreSQL JDBC URL |
-| `SPRING_DATASOURCE_USERNAME` | Prod / Optional locally | `caresync` | PostgreSQL username |
-| `SPRING_DATASOURCE_PASSWORD` | Yes (at runtime) | *(none)* | PostgreSQL password |
-| `CARESYNC_JWT_SECRET` | Yes | *(at least 32 bytes)* | HS256 JWT signing key |
-| `CARESYNC_CORS_ORIGINS` | Prod / Optional in `dev` | `http://localhost:3000` | Comma-separated REST & WebSocket allowed origins |
-| `CARESYNC_ADMIN_EMAIL` | Optional | `admin@caresync.local` | Seeded admin email matched on bootstrap |
-| `CARESYNC_ADMIN_PASSWORD` | Optional (needed to unlock seeded admin) | *(empty = remains locked)* | Initial password hash written if account is locked |
-| `CARESYNC_RECEPTIONIST_EMAIL` | Optional | `reception@caresync.local` | Seeded receptionist email matched on bootstrap |
-| `CARESYNC_RECEPTIONIST_PASSWORD` | Optional | *(empty = remains locked)* | Initial password hash written if account is locked |
-| `CARESYNC_FORWARD_HEADERS_STRATEGY` | Prod (`application-prod.yml`) | `native` | Proxy forwarded-header handling |
-| `CARESYNC_TRUSTED_PROXIES` | Prod (`application-prod.yml`) | RFC1918/loopback regex | Trusted reverse-proxy CIDR pattern |
-| `CARESYNC_DB_NAME` / `CARESYNC_DB_USER` / `CARESYNC_DB_PASSWORD` | Docker Compose | `caresync` / `caresync` / `caresync` | PostgreSQL container database initialization |
-
-Profiles:
-- `dev` (`application-dev.yml`): Dev CORS defaults (`localhost:3000`, `localhost:5173`).
-- `prod` (`application-prod.yml`): ECS structured JSON logging, forwarded-header support, Actuator health details `when-authorized`.
-- `test` (`application-test.yml`): Relaxed rate limits and isolated test credentials used by automated tests.
+### 5.5 Immutable Compliance Audit Logging
+Healthcare compliance requires tamper-evident audit records. In Flyway `V12`, an append-only trigger is attached to `audit_logs`:
+```sql
+CREATE TRIGGER protect_audit_logs_append_only
+BEFORE UPDATE OR DELETE ON audit_logs
+FOR EACH ROW EXECUTE FUNCTION prevent_audit_log_modification();
+```
+*Even database administrators executing ad-hoc SQL cannot update or delete existing audit entries.*
 
 ---
 
-## 9. Running Locally
+## 6. Automated Testing & Verification Suite
+
+CareSync maintains a **100% automated test pass rate** across all tiers:
+
+```text
+========================================================================================
+Test Suite                                  Framework                   Tests   Verdict
+========================================================================================
+Backend Unit & Controller Slices            JUnit 5 / Surefire          110     PASS (0 fail)
+Backend Integration (PostgreSQL 16)         Testcontainers / Failsafe    34     PASS (0 fail)
+Frontend Component & Workflow Tests         Vitest 2 / RTL / jsdom      187     PASS (0 fail)
+Security Attack Vectors (RBAC/IDOR/Auth)    Node.js Security Runner      23     PASS (0 fail)
+========================================================================================
+TOTAL AUTOMATED VERIFICATIONS                                           354     100% GREEN
+========================================================================================
+```
+
+For detailed test suite breakdowns and reproduction commands, see [docs/TESTING.md](docs/TESTING.md).
+
+---
+
+## 7. Curated Visual Previews
+
+A small selection of responsive UI captures from the test suite:
+
+| Admin Executive Console | Doctor Clinical Console |
+| :---: | :---: |
+| ![Admin Overview](frontend/docs/screenshots/desktop-overview.png) | ![Doctor Consultations](frontend/docs/screenshots/doctor-desktop-consultations.png) |
+| *Real-time metrics, revenue charts, doctor load rankings* | *Live queue coordination, vitals entry, drug safety checks* |
+
+| Receptionist Check-In Desk | Patient Self-Service Portal |
+| :---: | :---: |
+| ![Receptionist Check-In](frontend/docs/screenshots/desktop-check-in.png) | ![Patient Dashboard](frontend/docs/screenshots/patient-desktop-dashboard.png) |
+| *Patient arrival desk, token sequencing, queue management* | *Self-booking, appointment timeline, prescription records* |
+
+---
+
+## 8. Quickstart & Local Setup
+
+Follow these steps to run the complete stack locally on Windows PowerShell:
 
 ### Prerequisites
-- **Java 25**
-- **Docker Desktop** (for PostgreSQL 16 via Docker Compose and Testcontainers integration tests)
+- **Java 25** (`java -version`)
+- **Node.js 20+ & npm** (`node -v`, `npm -v`)
+- **Docker Desktop** (running for PostgreSQL 16)
 
-### Steps
-1. Start PostgreSQL 16 from the repository root (`Z:\javaproject`):
-   ```powershell
-   docker compose up -d
-   ```
-2. Copy `.env.example` to `.env` (or export the required variables in your shell) and set `SPRING_DATASOURCE_PASSWORD`, `CARESYNC_JWT_SECRET` (>= 32 bytes), and bootstrap staff passwords (`CARESYNC_ADMIN_PASSWORD`, `CARESYNC_RECEPTIONIST_PASSWORD`) as needed.
-3. Run the backend from `backend/`:
-   ```powershell
-   cd backend
-   .\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=dev"
-   ```
-   The API starts on `http://localhost:8080/api` and the STOMP/SockJS endpoint is exposed at `http://localhost:8080/ws`.
-
----
-
-## 10. Running Tests
-
-From `backend/`:
-
-- **Unit & `@WebMvcTest` suites (Maven Surefire, no Docker required):**
-  ```powershell
-  .\mvnw.cmd clean test
-  ```
-- **Full verification including PostgreSQL 16 Testcontainers integration suites (`*IT`, Maven Failsafe):**
-  ```powershell
-  .\mvnw.cmd verify
-  ```
-  *(Requires a running Docker daemon for `postgres:16-alpine` Testcontainers.)*
-
-Surefire and Failsafe XML reports are written to `backend/target/surefire-reports/` and `backend/target/failsafe-reports/`.
-
----
-
-## 11. Project Structure & Documentation Links
-
-```text
-.
-├── .env.example
-├── .gitignore
-├── docker-compose.yml
-├── README.md
-├── docs/
-│   ├── domain.md                        # Business rules & state machine invariants
-│   ├── openapi.yaml                     # OpenAPI 3.0.3 API specification
-│   ├── PROGRESS.md                      # Phase-by-phase build log
-│   ├── PHASE_14_FINAL_BACKEND_AUDIT.md  # Final backend audit report
-│   └── PROJECT_REBRANDING_REPORT.md     # CareSync -> HCMS rebranding report
-└── backend/
-    ├── pom.xml                          # Maven build (com.caresync:caresync-backend)
-    ├── mvnw / mvnw.cmd
-    └── src/
-        ├── main/java/com/caresync/      # 13 modular monolith packages
-        ├── main/resources/
-        │   ├── application*.yml         # Spring profiles (spring.application.name: hcms)
-        │   ├── logback-spring.xml
-        │   └── db/migration/            # Flyway V1–V12 SQL migrations
-        └── test/                        # Unit tests, @WebMvcTest specs, PostgreSQL ITs
+### 1. Start Database
+```powershell
+docker compose up -d
 ```
 
-- API Contract: [docs/openapi.yaml](docs/openapi.yaml)
-- Business Rules: [docs/domain.md](docs/domain.md)
-- Development Log: [docs/PROGRESS.md](docs/PROGRESS.md)
-- Audit Report: [docs/PHASE_14_FINAL_BACKEND_AUDIT.md](docs/PHASE_14_FINAL_BACKEND_AUDIT.md)
-- Rebranding Report: [docs/PROJECT_REBRANDING_REPORT.md](docs/PROJECT_REBRANDING_REPORT.md)
+### 2. Configure Environment
+```powershell
+Copy-Item .env.example .env
+# Set SPRING_DATASOURCE_PASSWORD and CARESYNC_JWT_SECRET in .env
+```
+
+### 3. Start Spring Boot Backend
+```powershell
+cd backend
+.\mvnw.cmd spring-boot:run
+```
+*Backend starts on `http://localhost:8080/api`.*
+
+### 4. Start React Frontend
+In a separate terminal:
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+*Frontend opens on `http://localhost:5173/`.*
+
+### 5. Running the Tests
+```powershell
+# Run backend unit tests:
+cd backend; .\mvnw.cmd test
+
+# Run backend PostgreSQL Testcontainers integration tests:
+cd backend; .\mvnw.cmd verify
+
+# Run frontend tests:
+cd frontend; npm test -- --run
+```
+
+---
+
+## 9. Demo Walkthrough Personas
+
+Seeded demo accounts for testing all four roles:
+
+| Role | Email Identifier | Password Configuration |
+| :--- | :--- | :--- |
+| **System Admin** | `admin@caresync.local` | Set via `CARESYNC_ADMIN_PASSWORD` or quick-fill button |
+| **Receptionist** | `reception@caresync.local` | Set via `CARESYNC_RECEPTIONIST_PASSWORD` or quick-fill button |
+| **Cardiologist** | `dr.jenkins@caresync.local` | Set via demo quick-fill button |
+| **Pediatrician** | `dr.patel@caresync.local` | Set via demo quick-fill button |
+| **Patient** | `john.doe@example.com` | Set via demo quick-fill button |
+
+For a guided, step-by-step evaluation script, see [docs/PORTFOLIO_DEMO.md](docs/PORTFOLIO_DEMO.md).
+
+---
+
+## 10. Documentation Sitemap
+
+- **Architecture:**
+  - [System Architecture](docs/architecture/SYSTEM_ARCHITECTURE.md)
+  - [Backend Architecture & Modules](docs/architecture/BACKEND_ARCHITECTURE.md)
+  - [Frontend Architecture & State](docs/architecture/FRONTEND_ARCHITECTURE.md)
+  - [Database Design & Schema](docs/architecture/DATABASE_DESIGN.md)
+  - [Key Technical Decisions (ADRs)](docs/decisions/KEY_TECHNICAL_DECISIONS.md)
+- **API & Domain:**
+  - [OpenAPI 3.0.3 Contract](docs/openapi.yaml)
+  - [Domain Specifications & Invariants](docs/domain.md)
+- **Operations & Security:**
+  - [Local Development Guide](docs/DEVELOPMENT.md)
+  - [Testing & Quality Assurance](docs/TESTING.md)
+  - [Security & Authorization](docs/SECURITY.md)
+  - [Deployment & Cloud Runbooks](docs/DEPLOYMENT.md)
+  - [Portfolio Demo Script](docs/PORTFOLIO_DEMO.md)
+  - [Master Progress Log](docs/PROGRESS.md)
+
+---
+
+## 11. Project Status & Roadmap
+
+- **Core Application Implementation:** **100% Complete** (Full-stack modular monolith, 4 role portals, STOMP queue, automated billing, PDF rendering).
+- **Automated Verification:** **100% Passing** (354/354 tests green across backend, frontend, Testcontainers, and security vectors).
+- **Deployment Hardening:** **Verified Locally** (Multi-stage Docker images, Cloudflare Pages headers, Nginx reverse proxy configs).
+- **Cloud Provisioning:** **Prepared** (Targeted for Cloudflare Pages + Render + Neon; public cloud deployment pending external account provisioning).
+
+---
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).

@@ -504,6 +504,30 @@
   - Verified zero remote operations executed (`git push` strictly avoided).
 - [x] **Final Git Organization Verdict:** **`PASS — All intended categories committed locally; working tree clean.`**
 
+## 2026-11-14: Phase 27 — Documentation Audit, Cleanup & Portfolio Presentation
+- [x] **Documentation Inventory & Classification:**
+  - Audited all 55 project markdown files, OpenAPI 3.0.3 specification, domain model, and architecture reports.
+  - Classified files into recruiter-facing, developer guides, deployment runbooks, and historical archives.
+- [x] **Architecture Documentation Suite:**
+  - Authored `docs/architecture/SYSTEM_ARCHITECTURE.md` (Modular monolith style, communication patterns, security, and deployment topologies).
+  - Authored `docs/architecture/BACKEND_ARCHITECTURE.md` (Java 25, Spring Boot 4.1.2, 13 domain packages, Virtual Threads, ports/adapters, transactions, Flyway).
+  - Authored `docs/architecture/FRONTEND_ARCHITECTURE.md` (React 18, Vite 6, Tailwind, single-flight refresh token mutex, STOMP WebSockets, 4 role portals).
+  - Authored `docs/architecture/DATABASE_DESIGN.md` (PostgreSQL 16, entity relationships, partial unique indexes, atomic token counters, append-only trigger).
+  - Authored `docs/decisions/KEY_TECHNICAL_DECISIONS.md` (9 comprehensive Architecture Decision Records covering monolithic modularity, virtual threads, RTR mutex, decimal arithmetic, and immutable audit logs).
+- [x] **Developer & Operational Guides:**
+  - Authored `docs/DEVELOPMENT.md` (Local Windows PowerShell runbook, prerequisites, environment setup, database management, and troubleshooting).
+  - Authored `docs/TESTING.md` (Testing pyramid, test metrics: 110 unit + 34 integration + 187 frontend + 23 security vectors = 354 tests green).
+  - Authored `docs/SECURITY.md` (Stateless JWT, RTR replay detection, RBAC matrix, Anti-IDOR guards, doctor-patient scoping, rate limiting, and compliance triggers).
+  - Authored `docs/DEPLOYMENT.md` (Cloudflare Pages + Render + Neon setup, on-premises Nginx TLS stack, and environment contracts).
+  - Authored `docs/PORTFOLIO_DEMO.md` (Recruiter demo walkthrough, synthetic personas, cross-role arrival-to-consultation and billing scenarios).
+  - Authored dedicated `backend/README.md` and modernized `frontend/README.md`.
+  - Upgraded root `README.md` into a comprehensive, recruiter-ready technical portfolio showcase with Mermaid diagrams and curated UI previews.
+- [x] **Historical Archive Organization:**
+  - Preserved all 25 historical phase audit reports in `docs/archive/phase-reports/`.
+  - Preserved pre-push Git audit reports in `docs/archive/git-audits/`.
+  - Duplicated OpenAPI 3.0.3 specification to `docs/api/openapi.yaml` while preserving canonical `docs/openapi.yaml`.
+- [x] **Final Phase 27 Documentation Verdict:** **`PASS — documentation is organized and portfolio-ready.`**
+
 
 
 

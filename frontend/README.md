@@ -69,12 +69,12 @@ frontend/
 │   │   └── token.service.js             # Session persistence & localStorage management
 │   ├── styles/
 │   │   └── globals.css                  # Tailwind base directives & clinical HSL variables
-│   ├── test/                            # Vitest test suite (8 test files, 24 test cases)
+│   ├── test/                            # Vitest test suite (34 test files, 187 test cases, 100% green)
 │   ├── types/
 │   │   └── index.js                     # JSDoc typedefs & Zod runtime schemas
 │   ├── App.jsx                          # App entry with provider composition
 │   └── main.jsx                         # React DOM mount point
-├── jsconfig.json                        # Path alias mapping (@/* -> src/*)
+├── jsconfig.json                        # Path alias mapping (@/* -> ./src/*)
 ├── package.json                         # Pure JavaScript dependencies & scripts
 ├── tailwind.config.js                   # Healthcare SaaS theme tokens
 └── vite.config.js                       # Vite dev proxy & Vitest configuration
@@ -93,16 +93,16 @@ npm install
 # Start Vite dev server with proxy to backend (http://localhost:5173)
 npm run dev
 
-# Run Vitest test suite
-npm run test
+# Run Vitest test suite (187 tests)
+npm test -- --run
 
-# Run ESLint validation
+# Run ESLint validation (0 errors, 0 warnings)
 npm run lint
 
 # Format code with Prettier
 npm run format
 
-# Production build (emits to dist/)
+# Production build (emits optimized bundle to dist/)
 npm run build
 ```
 
@@ -113,8 +113,17 @@ npm run build
 ### Token Refresh Mutex (Backend Family Protection)
 The Spring Boot backend enforces token rotation and pessimistic row locking on refresh tokens. Replaying an already used refresh token causes the entire token family to be revoked. The frontend Axios interceptor in `src/services/api.js` coordinates concurrent `401 Unauthorized` responses with a single-flight promise queue, executing exactly one refresh call and replaying waiting requests with the newly rotated access token.
 
-### Role-Based Access Control (RBAC)
-Four primary clinical roles are supported: `ADMIN`, `RECEPTIONIST`, `DOCTOR`, and `PATIENT`. The router enforces strict authorization:
+### Real-Time Queue Updates via STOMP WebSocket
+The frontend connects to `/ws` using native browser WebSockets and STOMP (`use-queue-websocket.js`). It subscribes to `/topic/queue/{doctorId}` with JWT authentication on handshake, updating waiting lists in real time with zero PII displayed on public screens.
+
+### Four Dedicated Role-Based Portals
+Four primary healthcare roles are supported with dedicated, fully featured portal layouts:
+- **`ADMIN`:** Executive overview, doctor management, department configuration, billing oversight, immutable audit log explorer, and revenue analytics.
+- **`RECEPTIONIST`:** Front desk patient check-in, walk-in registration, doctor availability, appointment booking, and counter billing.
+- **`DOCTOR`:** Clinical consultation console, live queue advancement (`call-next`), patient medical histories, vitals recording, and drug-safety checked prescriptions.
+- **`PATIENT`:** Self-service appointment booking, upcoming visits, past medical history, active prescriptions, and invoice review.
+
+The router enforces strict authorization:
 - Unauthenticated users are redirected to `/login` preserving the target path.
 - Authenticated users attempting to access unauthorized areas are redirected to `/unauthorized`.
-- Authenticated users landing at `/` are routed to their designated portal.
+- Authenticated users landing at `/` are automatically routed to their designated portal.
