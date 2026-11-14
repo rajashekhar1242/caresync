@@ -1,13 +1,14 @@
 openapi: 3.0.3
 
 info:
-  title: CareSync API
+  title: Hospital & Clinic Management System API
   version: 0.1.0
   description: |
-    REST API for CareSync, a hospital/clinic management system.
+    REST API for Hospital & Clinic Management System (HCMS).
 
     **Conventions**
-    - All endpoints are served under the `/api` base path.
+    - All REST endpoints are served under the `/api` base path. The queue
+      WebSocket at `/ws` is the only exception (see the Queue tag).
     - All timestamps are ISO-8601 in UTC (`date-time`).
     - Calendar dates and times of day without a zone (leave dates, schedule
       `HH:mm`, the slots `date` query) are in the clinic's IANA time zone.
@@ -38,14 +39,77 @@ tags:
   - name: Auth
     description: Registration, login, token refresh, logout and current user
   - name: Consultations
-    description: "Clinical notes written by the treating doctor. A doctor has treated a patient once they have written at least one consultation for that patient."
+    description: "Clinical notes written by the treating doctor. A doctor has treated a patient once they have written at least one consultation for that patient. Every read and write of a consultation writes an audit log entry."
   - name: Medicines
     description: Medicine catalog (read-only reference data)
   - name: Prescriptions
-    description: Prescriptions, the allergy and interaction safety check, and PDFs
+    description: Prescriptions, the allergy and interaction safety check, and PDFs. Every read, creation and PDF download of a prescription writes an audit log entry. The safety check does not.
   - name: Billing
-    description: Invoices, payments and credit notes. Invoices are created automatically when an appointment moves to COMPLETED, so there is no endpoint to create one.
+    description: Invoices, payments and credit notes. Invoices are created automatically when an appointment moves to COMPLETED, so there is no endpoint to create one. Every billing write, every invoice PDF download and every single-invoice read writes an audit log entry. List views do not.
+  - name: Queue
+    description: |
+      Live waiting-room queue. REST returns the current state and a STOMP
+      WebSocket pushes every change.
 
+      **Tokens.** A patient receives a token when the appointment moves to
+      `CHECKED_IN`. Tokens count up from 1 for each doctor on each
+      clinic-local day and are never reused. Patients are served in token
+      order.
+
+      **WebSocket.** This is the only endpoint outside the `/api` base path.
+      - Endpoint: `/ws` at the server root, so `http://localhost:8080/ws` in
+        local development. The SockJS fallback is enabled, so use
+        `@stomp/stompjs` with SockJS.
+      - Subscribe to `/topic/queue/{doctorId}`, where `doctorId` is the
+        doctor profile UUID.
+      - Public and read-only: no bearer token is needed to connect or
+        subscribe. The server rejects every `SEND` and every destination
+        other than `/topic/queue/*`.
+      - Messages hold token numbers only, never patient names or ids,
+        because anyone can subscribe. Staff screens call
+        `GET /queue/doctors/{doctorId}` when a message arrives to get names.
+      - Every message is a full snapshot, not a change, so a client simply
+        replaces its state. Messages are sent after the database change has
+        committed and are never replayed, so call the REST endpoint once
+        after every connect or reconnect.
+      - The body is JSON described by the schema `QueueUpdateMessage`.
+        Exact example:
+
+      ```json
+      {
+        "type": "QUEUE_UPDATED",
+        "event": "PATIENT_CALLED",
+        "doctorId": "3f2b8a52-6c1e-4f4e-9a55-0d7f4c1b9a10",
+        "clinicId": "a1b2c3d4-0000-4000-8000-000000000001",
+        "date": "2026-11-12",
+        "nowServing": 12,
+        "next": [13, 14, 15, 16],
+        "waitingCount": 4,
+        "lastTokenIssued": 16,
+        "sentAt": "2026-11-12T04:05:12Z"
+      }
+      ```
+  - name: Audit
+    description: Admin-only read access to the audit trail. Entries are written by the server and can never be edited or deleted.
+  - name: Reports
+    description: |
+      Admin-only analytics, computed live from the database.
+
+      **Date ranges.** `from` and `to` are calendar dates, both inclusive,
+      in the report time zone. Appointments are placed by the date of
+      `slotStart`, invoices by the date of `createdAt`, and payments and
+      credit notes by the date of their own `createdAt`. `from` must not be
+      after `to`, and the range may not be longer than 366 days, otherwise
+      `400 VALIDATION_FAILED`.
+
+      **Time zone.** When `clinicId` is given, the clinic's time zone is
+      used. When it is omitted, the figures cover all clinics and the
+      server's configured reporting time zone is used (Asia/Kolkata in this
+      project). Every response states the zone it used in `timeZone`.
+
+      **Money.** Amounts are `Money` strings in INR with two decimals. The
+      only exception is `net` in the revenue report, which can be negative
+      and uses `SignedMoney`. VOID invoices are never counted.
 security:
   - bearerAuth: []
 
@@ -78,6 +142,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '409':
           $ref: '#/components/responses/Conflict'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
 
   /auth/login:
     post:
@@ -102,6 +168,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
 
   /auth/refresh:
     post:
@@ -130,6 +198,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
 
   /auth/logout:
     post:
@@ -313,6 +383,8 @@ paths:
         **Roles:** ADMIN.
         Creates a user with role `DOCTOR` plus the doctor profile in one
         transaction. A duplicate email returns `409 EMAIL_ALREADY_EXISTS`.
+        An unknown `specializationId`, `clinicId` or `departmentId` returns
+        404.
       requestBody:
         required: true
         content:
@@ -332,6 +404,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'  
         '409':
           $ref: '#/components/responses/Conflict'
 
@@ -364,7 +438,8 @@ paths:
         **Roles:** ADMIN.
         Changing `slotMinutes` only affects slots generated from now on;
         existing appointments are never modified. Setting `active: false`
-        hides the doctor from booking but keeps history.
+        hides the doctor from booking but keeps history. An unknown
+        `specializationId`, `clinicId` or `departmentId` returns 404.
       requestBody:
         required: true
         content:
@@ -942,7 +1017,18 @@ paths:
         `COMPLETED` also needs a consultation for this appointment with a
         non-blank `diagnosis`, otherwise `409 CONSULTATION_INCOMPLETE`. On
         success the consultation is finalized (no further edits) and the
-        invoice is created, all in one transaction.  
+        invoice is created, all in one transaction. If the doctor's
+        `consultationFee` is `0.00`, the invoice has total `0.00` and is
+        created as `PAID`.
+
+        `CHECKED_IN` also issues the doctor's next queue token and sets
+        `tokenNumber`. `IN_CONSULTATION` returns
+        `409 CONSULTATION_IN_PROGRESS` when the doctor already has an
+        appointment in consultation. A RECEPTIONIST can move a patient to
+        `IN_CONSULTATION` only through
+        `POST /queue/doctors/{doctorId}/call-next`. Check-in,
+        `IN_CONSULTATION` and `COMPLETED` publish a queue update (see the
+        Queue tag). 
 
         `reason` is stored as `cancellationReason` when the target is
         `CANCELLED` and ignored otherwise.
@@ -1396,7 +1482,8 @@ paths:
       description: |
         **Roles:** ADMIN, RECEPTIONIST, PATIENT (own invoices only).
         DOCTOR gets 403, and so does a PATIENT asking for someone else's
-        invoice.
+        invoice. Every successful read writes an audit log entry
+        (`INVOICE_READ`).
       responses:
         '200':
           description: Invoice
@@ -1558,8 +1645,8 @@ paths:
 
         A PAID invoice is never edited. A credit note is a separate document
         that records a correction. It is allowed only on a `PAID` invoice,
-        otherwise `409 INVOICE_NOT_PAID` (unpaid invoices are corrected by
-        other means). The sum of all credit notes on an invoice cannot exceed
+        otherwise `409 INVOICE_NOT_PAID` (a `PENDING` invoice is voided
+        instead). The sum of all credit notes on an invoice cannot exceed
         its `total`, otherwise `400 CREDIT_EXCEEDS_INVOICE`.
 
         The invoice stays `PAID`; its `creditedTotal` and `netTotal` change.
@@ -1605,7 +1692,9 @@ paths:
 
         Returns 404 when the appointment has no invoice yet, which is the
         case until it is `COMPLETED`. Checks run in this order: 404 for an
-        unknown appointment, 403, then 404 for a missing invoice.
+        unknown appointment, 403, then 404 for a missing invoice. A
+        successful read writes an audit log entry (`INVOICE_READ`), the same
+        as `GET /invoices/{invoiceId}`.
       responses:
         '200':
           description: Invoice
@@ -1619,6 +1708,443 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+
+  /invoices/{invoiceId}/void:
+    parameters:
+      - $ref: '#/components/parameters/InvoiceId'
+    post:
+      tags: [Billing]
+      operationId: voidInvoice
+      summary: Void an unpaid invoice
+      description: |
+        **Roles:** ADMIN, RECEPTIONIST. Everyone else gets 403.
+
+        Cancels an invoice that has received no payment. Allowed only while
+        the status is `PENDING`; the invoice becomes `VOID`, which is final.
+        There is no endpoint to remove a single line item, so voiding is how
+        an unpaid invoice with a wrong item is cancelled.
+
+        - `PAID` or already `VOID`: `409 INVOICE_IMMUTABLE`.
+        - `PARTIALLY_PAID`: `409 INVOICE_HAS_PAYMENTS`.
+
+        The `reason` is saved on the invoice as `voidReason` and also written
+        to the audit log entry (`INVOICE_VOIDED`). The voided invoice is
+        returned.
+        Checks run in this order: 400, 404, 403, 409.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VoidInvoiceRequest'
+      responses:
+        '200':
+          description: Invoice voided
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /queue/doctors/{doctorId}:
+    parameters:
+      - $ref: '#/components/parameters/DoctorId'
+    get:
+      tags: [Queue]
+      operationId: getDoctorQueue
+      summary: Get today's queue for a doctor
+      description: |
+        **Roles:** ADMIN, RECEPTIONIST, DOCTOR (own queue only). PATIENT
+        gets 403; patients use the public board instead.
+
+        "Today" is the current date in the doctor's clinic time zone. The
+        queue holds appointments that were checked in today. `nowServing` is
+        the one in `IN_CONSULTATION` (null if none), `next` lists up to 5
+        waiting patients in token order, and `waitingCount` counts all
+        patients still waiting. Contains patient names, so it is never sent
+        over the WebSocket.
+        Checks run in this order: 404, 403.
+      responses:
+        '200':
+          description: Today's queue
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueueStateResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /queue/doctors/{doctorId}/call-next:
+    parameters:
+      - $ref: '#/components/parameters/DoctorId'
+    post:
+      tags: [Queue]
+      operationId: callNextPatient
+      summary: Call the next waiting patient
+      description: |
+        **Roles:** DOCTOR (own queue only), RECEPTIONIST. ADMIN and PATIENT
+        get 403. No request body.
+
+        Takes the waiting patient with the lowest token (status
+        `CHECKED_IN`, checked in today) and moves that appointment to
+        `IN_CONSULTATION`, then publishes a queue update with event
+        `PATIENT_CALLED`. It is the same state change as
+        `PATCH /appointments/{appointmentId}/status`, and it is the only way
+        a RECEPTIONIST can start a consultation.
+
+        409 cases:
+        - `CONSULTATION_IN_PROGRESS`: the doctor already has a patient in
+          consultation; complete that appointment first. This also covers two
+          staff members pressing the button at the same moment, because the
+          second request finds the doctor busy.
+        - `QUEUE_EMPTY`: nobody is waiting.
+
+        Checks run in this order: 404, 403, 409.
+      responses:
+        '200':
+          description: Patient called; returns the updated queue
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueueStateResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /queue/board:
+    get:
+      tags: [Queue]
+      operationId: getQueueBoard
+      summary: Get the public waiting-room board for a clinic
+      description: |
+        **Roles:** none, this endpoint is public. Besides the auth endpoints
+        it is the only one that needs no token.
+
+        Built for the waiting-room display. The response has token numbers,
+        doctor names and the clinic name only: no patient names, patient ids
+        or appointment ids. It lists every active doctor of the clinic who
+        has a schedule range today and no leave today, plus any doctor who
+        has already issued a token today.
+
+        The display should call this once on load and after every WebSocket
+        reconnect, then follow `/topic/queue/{doctorId}` for each doctor.
+        Rate limited: too many requests return `429 TOO_MANY_REQUESTS`.
+      security: []
+      parameters:
+        - name: clinicId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Current board
+          headers:
+            Cache-Control:
+              description: Always no-store.
+              schema:
+                type: string
+                example: no-store
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueueBoardResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+  /audit-logs:
+    get:
+      tags: [Audit]
+      operationId: listAuditLogs
+      summary: List audit log entries
+      description: |
+        **Roles:** ADMIN. Everyone else gets 403.
+
+        Newest first. `from` is inclusive and `to` is exclusive; both filter
+        on `occurredAt` and are UTC instants. `from` must be before `to`
+        (otherwise 400). Filters combine with AND. The schema `AuditAction`
+        lists which operation writes which entry.
+
+        Entries cannot be created, changed or deleted through the API, and
+        reading this list is not itself audited.
+      parameters:
+        - name: userId
+          in: query
+          required: false
+          description: The user who performed the action.
+          schema:
+            type: string
+            format: uuid
+        - name: action
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/AuditAction'
+        - name: entityType
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/AuditEntityType'
+        - name: from
+          in: query
+          required: false
+          description: Inclusive lower bound on `occurredAt` (UTC).
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          required: false
+          description: Exclusive upper bound on `occurredAt` (UTC).
+          schema:
+            type: string
+            format: date-time
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+      responses:
+        '200':
+          description: A page of audit log entries
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditLogPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden' 
+
+  /reports/revenue:
+    get:
+      tags: [Reports]
+      operationId: getRevenueReport
+      summary: Revenue by date range, grouped by day or month
+      description: |
+        **Roles:** ADMIN. Everyone else gets 403.
+
+        Returns one bucket per day or month of the range, including buckets
+        with no activity (all figures zero), so a chart needs no gap filling.
+        With `groupBy=MONTH` the first and last buckets only cover the days
+        inside the range.
+
+        Per bucket and in `totals`:
+        - `invoiced`: the `total` of non-void invoices created.
+        - `collected`: payments recorded.
+        - `credited`: credit notes issued.
+        - `net`: `collected` minus `credited`, which can be negative.
+
+        An invoice that is voided later no longer counts in `invoiced`.
+        Checks run in this order: 403, 400, 404 (unknown `clinicId`).
+      parameters:
+        - $ref: '#/components/parameters/ReportFromParam'
+        - $ref: '#/components/parameters/ReportToParam'
+        - $ref: '#/components/parameters/ReportClinicParam'
+        - name: groupBy
+          in: query
+          required: false
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/ReportGroupBy'
+            default: DAY
+      responses:
+        '200':
+          description: Revenue report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RevenueReportResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /reports/appointments-by-department:
+    get:
+      tags: [Reports]
+      operationId: getAppointmentsByDepartmentReport
+      summary: Appointments by department
+      description: |
+        **Roles:** ADMIN. Everyone else gets 403.
+
+        Counts appointments whose `slotStart` falls in the range, per
+        department and by current status. A doctor belongs to exactly one
+        department, so every appointment is counted once. All departments
+        are listed, including those with no appointments (all counts zero),
+        sorted by `total` descending and then by name.
+        Checks run in this order: 403, 400, 404 (unknown `clinicId`).
+      parameters:
+        - $ref: '#/components/parameters/ReportFromParam'
+        - $ref: '#/components/parameters/ReportToParam'
+        - $ref: '#/components/parameters/ReportClinicParam'
+      responses:
+        '200':
+          description: Appointments by department
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppointmentsByDepartmentResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /reports/no-show-rate:
+    get:
+      tags: [Reports]
+      operationId: getNoShowRateReport
+      summary: No-show rate
+      description: |
+        **Roles:** ADMIN. Everyone else gets 403.
+
+        Looks at appointments whose `slotStart` falls in the range.
+        `eligible` is `completed` plus `noShow`, the appointments where the
+        patient was expected and either came or did not. CANCELLED
+        appointments and appointments that are still BOOKED, CHECKED_IN or
+        IN_CONSULTATION are left out. `ratePercent` is `noShow` divided by
+        `eligible`, times 100, rounded half up to two decimals, and null when
+        `eligible` is 0.
+
+        Because it relies on staff marking NO_SHOW, a past appointment that
+        was never marked does not count against the rate.
+        Checks run in this order: 403, 400, 404 (unknown `clinicId`).
+      parameters:
+        - $ref: '#/components/parameters/ReportFromParam'
+        - $ref: '#/components/parameters/ReportToParam'
+        - $ref: '#/components/parameters/ReportClinicParam'
+      responses:
+        '200':
+          description: No-show rate
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NoShowRateResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /reports/top-doctors:
+    get:
+      tags: [Reports]
+      operationId: getTopDoctorsReport
+      summary: Top doctors
+      description: |
+        **Roles:** ADMIN. Everyone else gets 403.
+
+        Ranks doctors by `rankBy`, highest first, and returns at most
+        `limit` of them. Ties are broken by doctor full name ascending.
+        Doctors with no completed appointment and no collected payment in
+        the range are not listed, and inactive doctors are included when they
+        have activity.
+
+        - `completedAppointments`: COMPLETED appointments whose `slotStart`
+          falls in the range.
+        - `noShows`: NO_SHOW appointments in the same range.
+        - `collected`: payments recorded in the range on the doctor's
+          invoices. Credit notes are not subtracted here.
+
+        Checks run in this order: 403, 400, 404 (unknown `clinicId`).
+      parameters:
+        - $ref: '#/components/parameters/ReportFromParam'
+        - $ref: '#/components/parameters/ReportToParam'
+        - $ref: '#/components/parameters/ReportClinicParam'
+        - name: rankBy
+          in: query
+          required: false
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/TopDoctorRankBy'
+            default: COMPLETED_APPOINTMENTS
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of doctors to return.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 20
+            default: 5
+      responses:
+        '200':
+          description: Top doctors
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TopDoctorsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /reports/dashboard:
+    get:
+      tags: [Reports]
+      operationId: getDashboardSummary
+      summary: Dashboard summary
+      description: |
+        **Roles:** ADMIN. Everyone else gets 403.
+
+        A snapshot as of now. "Today" is the current date in the report time
+        zone, and "this month" runs from the first day of that month through
+        today. `outstandingBalance` sums the `balance` of every invoice that
+        is `PENDING` or `PARTIALLY_PAID`, whatever its date. Patient counts
+        are not included because patients do not belong to a clinic.
+        Checks run in this order: 403, 404 (unknown `clinicId`).
+      parameters:
+        - $ref: '#/components/parameters/ReportClinicParam'
+      responses:
+        '200':
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardSummaryResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'                   
 components:
   securitySchemes:
     bearerAuth:
@@ -1702,7 +2228,33 @@ components:
       required: true
       schema:
         type: string
-        format: uuid        
+        format: uuid   
+    ReportFromParam:
+      name: from
+      in: query
+      required: true
+      description: First day of the range, inclusive, as a date in the report time zone.
+      schema:
+        type: string
+        format: date
+        example: '2026-11-01'
+    ReportToParam:
+      name: to
+      in: query
+      required: true
+      description: Last day of the range, inclusive, as a date in the report time zone.
+      schema:
+        type: string
+        format: date
+        example: '2026-11-30'
+    ReportClinicParam:
+      name: clinicId
+      in: query
+      required: false
+      description: Limit the report to one clinic. Omit it to cover all clinics.
+      schema:
+        type: string
+        format: uuid         
 
   schemas:
     # ---------- Enums ----------
@@ -1724,7 +2276,8 @@ components:
       type: string
       description: |
         PENDING: no payment yet. PARTIALLY_PAID: some payment received.
-        PAID: fully paid, immutable. VOID: cancelled before payment.
+        PAID: fully paid, immutable. An invoice with total 0.00 is created
+        as PAID. VOID: cancelled while PENDING, final.
       enum: [PENDING, PARTIALLY_PAID, PAID, VOID]
 
     PaymentMethod:
@@ -1941,7 +2494,7 @@ components:
     # ---------- Doctors ----------
     DoctorCreateRequest:
       type: object
-      required: [fullName, email, password, specializationId, clinicId, consultationFee, slotMinutes]
+      required: [fullName, email, password, specializationId, clinicId, departmentId, consultationFee, slotMinutes]
       properties:
         fullName:
           type: string
@@ -1967,6 +2520,10 @@ components:
         clinicId:
           type: string
           format: uuid
+        departmentId:
+          type: string
+          format: uuid
+          description: Department the doctor belongs to. Set by an Admin. Used for the appointments-by-department report.
         consultationFee:
           $ref: '#/components/schemas/Money'
         slotMinutes:
@@ -1979,7 +2536,7 @@ components:
 
     DoctorUpdateRequest:
       type: object
-      required: [fullName, specializationId, clinicId, consultationFee, slotMinutes, active]
+      required: [fullName, specializationId, clinicId, departmentId, consultationFee, slotMinutes, active]
       properties:
         fullName:
           type: string
@@ -1994,6 +2551,10 @@ components:
         clinicId:
           type: string
           format: uuid
+        departmentId:
+          type: string
+          format: uuid
+          description: Department the doctor belongs to. Set by an Admin. Used for the appointments-by-department report.  
         consultationFee:
           $ref: '#/components/schemas/Money'
         slotMinutes:
@@ -2007,7 +2568,7 @@ components:
     DoctorResponse:
       type: object
       description: Contact details are intentionally omitted because patients can read this.
-      required: [id, userId, fullName, specializationId, clinicId, consultationFee, slotMinutes, active]
+      required: [id, userId, fullName, specializationId, clinicId, departmentId, consultationFee, slotMinutes, active]
       properties:
         id:
           type: string
@@ -2024,6 +2585,10 @@ components:
         clinicId:
           type: string
           format: uuid
+        departmentId:
+          type: string
+          format: uuid
+          description: Department the doctor belongs to. Set by an Admin. Used for the appointments-by-department report.  
         consultationFee:
           $ref: '#/components/schemas/Money'
         slotMinutes:
@@ -2396,6 +2961,11 @@ components:
         cancellationReason:
           type: string
           nullable: true
+        tokenNumber:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: Queue token issued at check-in. Null until the appointment is CHECKED_IN.  
         createdAt:
           type: string
           format: date-time
@@ -2927,6 +3497,10 @@ components:
           format: date-time
           nullable: true
           description: Set when the status becomes PAID.
+        voidReason:
+          type: string
+          nullable: true
+          description: Why the invoice was voided. Set only when the status is VOID.
 
     InvoiceResponse:
       allOf:
@@ -2975,7 +3549,556 @@ components:
             content:
               type: array
               items:
-                $ref: '#/components/schemas/InvoiceSummary'                              
+                $ref: '#/components/schemas/InvoiceSummary'    
+
+        # ---------- Billing additions (part 5) ----------
+    VoidInvoiceRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          minLength: 5
+          maxLength: 500
+          example: Wrong patient was billed
+
+    # ---------- Queue ----------
+    QueueEvent:
+      type: string
+      description: |
+        What caused a queue update. Informational only, because every
+        message carries the full snapshot.
+        TOKEN_ISSUED: a patient was checked in and received a token.
+        PATIENT_CALLED: a patient was moved to IN_CONSULTATION.
+        CONSULTATION_COMPLETED: the appointment in consultation was completed.
+      enum: [TOKEN_ISSUED, PATIENT_CALLED, CONSULTATION_COMPLETED]
+
+    QueueEntry:
+      type: object
+      description: One patient in the queue. Contains patient details, so it is only returned to staff.
+      required: [tokenNumber, appointmentId, patientId, patientName, slotStart, checkedInAt]
+      properties:
+        tokenNumber:
+          type: integer
+          minimum: 1
+          example: 13
+        appointmentId:
+          type: string
+          format: uuid
+        patientId:
+          type: string
+          format: uuid
+        patientName:
+          type: string
+        slotStart:
+          type: string
+          format: date-time
+        checkedInAt:
+          type: string
+          format: date-time
+
+    QueueStateResponse:
+      type: object
+      required: [doctorId, doctorName, clinicId, timeZone, date, nowServing, next, waitingCount, lastTokenIssued, generatedAt]
+      properties:
+        doctorId:
+          type: string
+          format: uuid
+        doctorName:
+          type: string
+        clinicId:
+          type: string
+          format: uuid
+        timeZone:
+          type: string
+          example: Asia/Kolkata
+        date:
+          type: string
+          format: date
+          description: The clinic-local day this queue belongs to.
+        nowServing:
+          allOf:
+            - $ref: '#/components/schemas/QueueEntry'
+          nullable: true
+          description: The patient in consultation, or null when none.
+        next:
+          type: array
+          maxItems: 5
+          description: Waiting patients in token order.
+          items:
+            $ref: '#/components/schemas/QueueEntry'
+        waitingCount:
+          type: integer
+          minimum: 0
+          description: Number of patients still waiting, not counting nowServing.
+        lastTokenIssued:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: Highest token issued today, or null if none yet.
+        generatedAt:
+          type: string
+          format: date-time
+
+    QueueTokenView:
+      type: object
+      description: One doctor on the public board. Token numbers only.
+      required: [doctorId, doctorName, nowServing, next, waitingCount, lastTokenIssued]
+      properties:
+        doctorId:
+          type: string
+          format: uuid
+        doctorName:
+          type: string
+        nowServing:
+          type: integer
+          minimum: 1
+          nullable: true
+        next:
+          type: array
+          maxItems: 5
+          items:
+            type: integer
+            minimum: 1
+        waitingCount:
+          type: integer
+          minimum: 0
+        lastTokenIssued:
+          type: integer
+          minimum: 1
+          nullable: true
+
+    QueueBoardResponse:
+      type: object
+      required: [clinicId, clinicName, timeZone, date, generatedAt, doctors]
+      properties:
+        clinicId:
+          type: string
+          format: uuid
+        clinicName:
+          type: string
+        timeZone:
+          type: string
+          example: Asia/Kolkata
+        date:
+          type: string
+          format: date
+        generatedAt:
+          type: string
+          format: date-time
+        doctors:
+          type: array
+          items:
+            $ref: '#/components/schemas/QueueTokenView'
+
+    QueueUpdateMessage:
+      type: object
+      description: Body of every WebSocket message on /topic/queue/{doctorId}. A full snapshot with token numbers only.
+      required: [type, event, doctorId, clinicId, date, nowServing, next, waitingCount, lastTokenIssued, sentAt]
+      properties:
+        type:
+          type: string
+          enum: [QUEUE_UPDATED]
+        event:
+          $ref: '#/components/schemas/QueueEvent'
+        doctorId:
+          type: string
+          format: uuid
+        clinicId:
+          type: string
+          format: uuid
+        date:
+          type: string
+          format: date
+          description: The clinic-local day of this queue.
+        nowServing:
+          type: integer
+          minimum: 1
+          nullable: true
+        next:
+          type: array
+          maxItems: 5
+          items:
+            type: integer
+            minimum: 1
+        waitingCount:
+          type: integer
+          minimum: 0
+        lastTokenIssued:
+          type: integer
+          minimum: 1
+          nullable: true
+        sentAt:
+          type: string
+          format: date-time
+      example:
+        type: QUEUE_UPDATED
+        event: PATIENT_CALLED
+        doctorId: 3f2b8a52-6c1e-4f4e-9a55-0d7f4c1b9a10
+        clinicId: a1b2c3d4-0000-4000-8000-000000000001
+        date: '2026-11-12'
+        nowServing: 12
+        next: [13, 14, 15, 16]
+        waitingCount: 4
+        lastTokenIssued: 16
+        sentAt: '2026-11-12T04:05:12Z'
+
+    # ---------- Audit ----------
+    AuditEntityType:
+      type: string
+      enum: [PATIENT, CONSULTATION, PRESCRIPTION, INVOICE]
+
+    AuditAction:
+      type: string
+      description: |
+        What was done. Each value is written by exactly these operations, and
+        only when the operation succeeds.
+
+        | Action | Entity type | Written by |
+        |--------|-------------|------------|
+        | PATIENT_READ | PATIENT | GET /patients/{patientId} |
+        | CONSULTATION_CREATED | CONSULTATION | POST /appointments/{appointmentId}/consultation |
+        | CONSULTATION_UPDATED | CONSULTATION | PUT /consultations/{consultationId} |
+        | CONSULTATION_FINALIZED | CONSULTATION | the appointment moving to COMPLETED (the user is the doctor) |
+        | CONSULTATION_READ | CONSULTATION | GET /consultations/{consultationId}, GET /appointments/{appointmentId}/consultation |
+        | PRESCRIPTION_CREATED | PRESCRIPTION | POST /prescriptions |
+        | PRESCRIPTION_READ | PRESCRIPTION | GET /prescriptions/{prescriptionId} |
+        | PRESCRIPTION_LIST_READ | PATIENT | GET /patients/{patientId}/prescriptions |
+        | PRESCRIPTION_PDF_DOWNLOADED | PRESCRIPTION | GET /prescriptions/{prescriptionId}/pdf |
+        | INVOICE_CREATED | INVOICE | the appointment moving to COMPLETED (the user is the doctor) |
+        | INVOICE_READ | INVOICE | GET /invoices/{invoiceId}, GET /appointments/{appointmentId}/invoice |
+        | INVOICE_ITEM_ADDED | INVOICE | POST /invoices/{invoiceId}/items |
+        | PAYMENT_RECORDED | INVOICE | POST /invoices/{invoiceId}/payments |
+        | CREDIT_NOTE_ISSUED | INVOICE | POST /invoices/{invoiceId}/credit-notes |
+        | INVOICE_VOIDED | INVOICE | POST /invoices/{invoiceId}/void |
+        | INVOICE_PDF_DOWNLOADED | INVOICE | GET /invoices/{invoiceId}/pdf |
+
+        `entityId` is the id of the entity type in the second column.
+        Lists and the prescription safety check are not audited.
+      enum:
+        - PATIENT_READ
+        - CONSULTATION_CREATED
+        - CONSULTATION_UPDATED
+        - CONSULTATION_FINALIZED
+        - CONSULTATION_READ
+        - PRESCRIPTION_CREATED
+        - PRESCRIPTION_READ
+        - PRESCRIPTION_LIST_READ
+        - PRESCRIPTION_PDF_DOWNLOADED
+        - INVOICE_CREATED
+        - INVOICE_READ
+        - INVOICE_ITEM_ADDED
+        - PAYMENT_RECORDED
+        - CREDIT_NOTE_ISSUED
+        - INVOICE_VOIDED
+        - INVOICE_PDF_DOWNLOADED
+
+    AuditLogResponse:
+      type: object
+      required: [id, occurredAt, userId, userName, userRole, action, entityType, entityId]
+      properties:
+        id:
+          type: string
+          format: uuid
+        occurredAt:
+          type: string
+          format: date-time
+        userId:
+          type: string
+          format: uuid
+          description: The user who performed the action.
+        userName:
+          type: string
+          description: Full name at the time of the action.
+        userRole:
+          $ref: '#/components/schemas/Role'
+        action:
+          $ref: '#/components/schemas/AuditAction'
+        entityType:
+          $ref: '#/components/schemas/AuditEntityType'
+        entityId:
+          type: string
+          format: uuid
+        patientId:
+          type: string
+          format: uuid
+          nullable: true
+          description: The patient this entry is about, when there is one.
+        details:
+          type: string
+          maxLength: 500
+          nullable: true
+          description: Short human-readable summary, for example the payment amount or the void reason.
+          example: Payment of 500.00 by UPI
+        ipAddress:
+          type: string
+          nullable: true
+          example: 203.0.113.42
+
+    AuditLogPage:
+      allOf:
+        - $ref: '#/components/schemas/PageResponse'
+        - type: object
+          properties:
+            content:
+              type: array
+              items:
+                $ref: '#/components/schemas/AuditLogResponse'   
+
+        # ---------- Reports (part 5b) ----------
+    SignedMoney:
+      type: string
+      pattern: '^(0\.00|-?(0\.(0[1-9]|[1-9][0-9])|[1-9][0-9]{0,9}\.[0-9]{2}))$'
+      description: |
+        Like Money, but may be negative, for example "-200.00". Used only
+        where a result can fall below zero. Zero is always "0.00", never
+        "-0.00". Parse it with a decimal library, not parseFloat.
+      example: '-200.00'
+
+    ReportGroupBy:
+      type: string
+      enum: [DAY, MONTH]
+
+    ReportScope:
+      type: object
+      description: The filters a report was computed with. Every report except the dashboard starts with these fields.
+      required: [from, to, timeZone, clinicId]
+      properties:
+        from:
+          type: string
+          format: date
+          description: First day of the range, inclusive.
+        to:
+          type: string
+          format: date
+          description: Last day of the range, inclusive.
+        timeZone:
+          type: string
+          description: IANA time zone the dates were interpreted in. It is the clinic time zone when a clinic was given and the server reporting time zone otherwise.
+          example: Asia/Kolkata
+        clinicId:
+          type: string
+          format: uuid
+          nullable: true
+          description: The clinic filter that was applied, or null for all clinics.
+
+    RevenueFigures:
+      type: object
+      required: [invoiceCount, invoiced, collected, credited, net]
+      properties:
+        invoiceCount:
+          type: integer
+          minimum: 0
+          description: Non-void invoices created in the period.
+        invoiced:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          description: Sum of the total of those invoices.
+        collected:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          description: Sum of payments recorded in the period.
+        credited:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          description: Sum of credit notes issued in the period.
+        net:
+          allOf:
+            - $ref: '#/components/schemas/SignedMoney'
+          description: collected minus credited. Negative when more was credited than collected.
+
+    RevenueBucket:
+      allOf:
+        - $ref: '#/components/schemas/RevenueFigures'
+        - type: object
+          required: [period]
+          properties:
+            period:
+              type: string
+              pattern: '^[0-9]{4}-[0-9]{2}(-[0-9]{2})?$'
+              description: The day (YYYY-MM-DD) for DAY grouping or the month (YYYY-MM) for MONTH grouping, in the report time zone.
+              example: '2026-11-12'
+
+    RevenueReportResponse:
+      allOf:
+        - $ref: '#/components/schemas/ReportScope'
+        - type: object
+          required: [groupBy, currency, totals, buckets]
+          properties:
+            groupBy:
+              $ref: '#/components/schemas/ReportGroupBy'
+            currency:
+              $ref: '#/components/schemas/Currency'
+            totals:
+              $ref: '#/components/schemas/RevenueFigures'
+            buckets:
+              type: array
+              description: Oldest first, one per day or month of the range.
+              items:
+                $ref: '#/components/schemas/RevenueBucket'
+
+    AppointmentCounts:
+      type: object
+      description: Number of appointments by current status. `total` is the sum of the six status counts.
+      required: [total, booked, checkedIn, inConsultation, completed, cancelled, noShow]
+      properties:
+        total:
+          type: integer
+          minimum: 0
+        booked:
+          type: integer
+          minimum: 0
+        checkedIn:
+          type: integer
+          minimum: 0
+        inConsultation:
+          type: integer
+          minimum: 0
+        completed:
+          type: integer
+          minimum: 0
+        cancelled:
+          type: integer
+          minimum: 0
+        noShow:
+          type: integer
+          minimum: 0
+
+    DepartmentAppointmentCounts:
+      allOf:
+        - $ref: '#/components/schemas/AppointmentCounts'
+        - type: object
+          required: [departmentId, departmentName]
+          properties:
+            departmentId:
+              type: string
+              format: uuid
+            departmentName:
+              type: string
+
+    AppointmentsByDepartmentResponse:
+      allOf:
+        - $ref: '#/components/schemas/ReportScope'
+        - type: object
+          required: [totals, departments]
+          properties:
+            totals:
+              $ref: '#/components/schemas/AppointmentCounts'
+            departments:
+              type: array
+              items:
+                $ref: '#/components/schemas/DepartmentAppointmentCounts'
+
+    NoShowRateResponse:
+      allOf:
+        - $ref: '#/components/schemas/ReportScope'
+        - type: object
+          required: [completed, noShow, eligible, ratePercent]
+          properties:
+            completed:
+              type: integer
+              minimum: 0
+            noShow:
+              type: integer
+              minimum: 0
+            eligible:
+              type: integer
+              minimum: 0
+              description: Appointments with a known outcome, which is completed plus noShow.
+            ratePercent:
+              type: number
+              minimum: 0
+              maximum: 100
+              nullable: true
+              description: Percentage with up to two decimals, rounded half up. Null when `eligible` is 0, because there is nothing to divide.
+              example: 6.25
+
+    TopDoctorRankBy:
+      type: string
+      enum: [COMPLETED_APPOINTMENTS, COLLECTED_REVENUE]
+
+    TopDoctorEntry:
+      type: object
+      required: [rank, doctorId, doctorName, departmentId, departmentName, completedAppointments, noShows, collected]
+      properties:
+        rank:
+          type: integer
+          minimum: 1
+          description: 1-based position in this list. Ties are not shared.
+        doctorId:
+          type: string
+          format: uuid
+        doctorName:
+          type: string
+        departmentId:
+          type: string
+          format: uuid
+        departmentName:
+          type: string
+        completedAppointments:
+          type: integer
+          minimum: 0
+        noShows:
+          type: integer
+          minimum: 0
+        collected:
+          $ref: '#/components/schemas/Money'
+
+    TopDoctorsResponse:
+      allOf:
+        - $ref: '#/components/schemas/ReportScope'
+        - type: object
+          required: [rankBy, currency, doctors]
+          properties:
+            rankBy:
+              $ref: '#/components/schemas/TopDoctorRankBy'
+            currency:
+              $ref: '#/components/schemas/Currency'
+            doctors:
+              type: array
+              items:
+                $ref: '#/components/schemas/TopDoctorEntry'
+
+    DashboardSummaryResponse:
+      type: object
+      required: [clinicId, timeZone, today, generatedAt, appointmentsToday, waitingNow, currency, collectedToday, collectedThisMonth, outstandingBalance, unpaidInvoiceCount, activeDoctors]
+      properties:
+        clinicId:
+          type: string
+          format: uuid
+          nullable: true
+          description: The clinic filter that was applied, or null for all clinics.
+        timeZone:
+          type: string
+          example: Asia/Kolkata
+        today:
+          type: string
+          format: date
+          description: The current date in `timeZone`.
+        generatedAt:
+          type: string
+          format: date-time
+        appointmentsToday:
+          $ref: '#/components/schemas/AppointmentCounts'
+        waitingNow:
+          type: integer
+          minimum: 0
+          description: Patients checked in today and still waiting.
+        currency:
+          $ref: '#/components/schemas/Currency'
+        collectedToday:
+          $ref: '#/components/schemas/Money'
+        collectedThisMonth:
+          $ref: '#/components/schemas/Money'
+        outstandingBalance:
+          $ref: '#/components/schemas/Money'
+        unpaidInvoiceCount:
+          type: integer
+          minimum: 0
+          description: Invoices that are PENDING or PARTIALLY_PAID.
+        activeDoctors:
+          type: integer
+          minimum: 0                                               
   responses:
     BadRequest:
       description: Validation failed or the request body is malformed.
@@ -3151,4 +4274,51 @@ components:
                 code: INVOICE_IMMUTABLE
                 message: A paid invoice cannot be changed. Issue a credit note to correct it
                 path: /api/invoices/9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d/items
-                fieldErrors: []        
+                fieldErrors: [] 
+            duplicateTxnRef:
+              summary: Same payment reference already recorded
+              value:
+                timestamp: '2026-11-10T09:30:00Z'
+                status: 409
+                code: DUPLICATE_TXN_REF
+                message: A UPI payment with this reference already exists
+                path: /api/invoices/9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d/payments
+                fieldErrors: []
+            consultationInProgress:
+              summary: Doctor already has a patient in consultation
+              value:
+                timestamp: '2026-11-10T09:30:00Z'
+                status: 409
+                code: CONSULTATION_IN_PROGRESS
+                message: Finish the current consultation before calling the next patient
+                path: /api/queue/doctors/3f2b8a52-6c1e-4f4e-9a55-0d7f4c1b9a10/call-next
+                fieldErrors: []
+            queueEmpty:
+              summary: Nobody is waiting
+              value:
+                timestamp: '2026-11-10T09:30:00Z'
+                status: 409
+                code: QUEUE_EMPTY
+                message: No patients are waiting
+                path: /api/queue/doctors/3f2b8a52-6c1e-4f4e-9a55-0d7f4c1b9a10/call-next
+                fieldErrors: []
+
+    TooManyRequests:
+      description: Too many requests from this client. Retry after the delay in the `Retry-After` header.
+      headers:
+        Retry-After:
+          description: Seconds to wait before trying again.
+          schema:
+            type: integer
+            example: 30
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            timestamp: '2026-11-10T09:30:00Z'
+            status: 429
+            code: TOO_MANY_REQUESTS
+            message: Too many requests. Try again later
+            path: /api/queue/board
+            fieldErrors: []           

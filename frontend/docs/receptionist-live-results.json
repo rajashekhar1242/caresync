@@ -1,0 +1,186 @@
+[
+  {
+    "domain": "Auth",
+    "scenario": "Receptionist Login",
+    "status": "PASS",
+    "httpCode": 200,
+    "evidence": "Logged in as reception@caresync.local",
+    "notes": ""
+  },
+  {
+    "domain": "Auth",
+    "scenario": "Session Restoration (/auth/me)",
+    "status": "PASS",
+    "httpCode": 200,
+    "evidence": "role=RECEPTIONIST, id=00000000-0000-4000-8000-000000000002",
+    "notes": ""
+  },
+  {
+    "domain": "Auth",
+    "scenario": "Token Rotation (/auth/refresh)",
+    "status": "PASS",
+    "httpCode": 200,
+    "evidence": "Rotated accessToken issued",
+    "notes": ""
+  },
+  {
+    "domain": "Reference Data",
+    "scenario": "Directory Lookups (Departments, Specializations, Clinics)",
+    "status": "PASS",
+    "httpCode": 200,
+    "evidence": "Depts: 10, Specs: 8, Clinics: 3",
+    "notes": ""
+  },
+  {
+    "domain": "Patients",
+    "scenario": "Search & Directory Listing (/api/patients)",
+    "status": "PASS",
+    "httpCode": 200,
+    "evidence": "total=15",
+    "notes": ""
+  },
+  {
+    "domain": "Patients",
+    "scenario": "Walk-in Registration (POST /api/patients)",
+    "status": "PASS",
+    "httpCode": 201,
+    "evidence": "id=431185fc-bfd2-4b64-9c60-552e3c50ec4d, name=QA Receptionist Patient 1794563034414",
+    "notes": ""
+  },
+  {
+    "domain": "Patients",
+    "scenario": "Patient Profile Retrieval (/api/patients/{id})",
+    "status": "PASS",
+    "httpCode": 200,
+    "evidence": "allergies=Penicillin,Sulfonamides",
+    "notes": ""
+  },
+  {
+    "domain": "Doctors",
+    "scenario": "Physicians Directory (/api/doctors)",
+    "status": "PASS",
+    "httpCode": 200,
+    "evidence": "Selected=Dr. QA Integration Doctor Updated (id=076a61a5-4d7a-4f75-b534-a8b5ab8c69f2)",
+    "notes": ""
+  },
+  {
+    "domain": "Doctors",
+    "scenario": "Weekly Schedule Retrieval (/api/doctors/{id}/schedules)",
+    "status": "PASS",
+    "httpCode": 200,
+    "evidence": "Entries=7",
+    "notes": ""
+  },
+  {
+    "domain": "Doctors",
+    "scenario": "Doctor Leaves Listing (/api/doctors/{id}/leaves)",
+    "status": "PASS",
+    "httpCode": 200,
+    "evidence": "Leaves=0",
+    "notes": ""
+  },
+  {
+    "domain": "Scheduling",
+    "scenario": "Authoritative Slot Generation (/api/doctors/{id}/slots)",
+    "status": "PASS",
+    "httpCode": 200,
+    "evidence": "Slots=16, Available=2",
+    "notes": ""
+  },
+  {
+    "domain": "Appointments",
+    "scenario": "Book Appointment (POST /api/appointments)",
+    "status": "PASS",
+    "httpCode": 201,
+    "evidence": "id=0528061e-ea9e-4ede-b544-f37260ca119d, status=BOOKED",
+    "notes": ""
+  },
+  {
+    "domain": "Appointments",
+    "scenario": "Appointment Retrieval (/api/appointments/{id})",
+    "status": "PASS",
+    "httpCode": 200,
+    "evidence": "patientName=QA Receptionist Patient 1794563034414",
+    "notes": ""
+  },
+  {
+    "domain": "Check-In",
+    "scenario": "Patient Arrival Check-In (PATCH status CHECKED_IN)",
+    "status": "PASS",
+    "httpCode": 200,
+    "evidence": "Token=#2, status=CHECKED_IN",
+    "notes": ""
+  },
+  {
+    "domain": "Queue",
+    "scenario": "Doctor Queue State (/api/queue/doctors/{id})",
+    "status": "PASS",
+    "httpCode": 200,
+    "evidence": "waiting=1, lastToken=2",
+    "notes": ""
+  },
+  {
+    "domain": "Queue",
+    "scenario": "Public Queue Board (/api/queue/board)",
+    "status": "PASS",
+    "httpCode": 200,
+    "evidence": "Doctors on board: 5",
+    "notes": ""
+  },
+  {
+    "domain": "WebSocket",
+    "scenario": "STOMP Queue Channel Subscription (/ws)",
+    "status": "PASS",
+    "httpCode": 101,
+    "evidence": "STOMP CONNECTED and subscribed to /topic/queue/076a61a5-4d7a-4f75-b534-a8b5ab8c69f2",
+    "notes": ""
+  },
+  {
+    "domain": "RBAC Enforcement",
+    "scenario": "Admin Reports Forbidden (GET /reports/dashboard)",
+    "status": "PASS",
+    "httpCode": 403,
+    "evidence": "HTTP 403 Forbidden properly returned",
+    "notes": ""
+  },
+  {
+    "domain": "RBAC Enforcement",
+    "scenario": "Admin Audit Logs Forbidden (GET /audit-logs)",
+    "status": "PASS",
+    "httpCode": 403,
+    "evidence": "HTTP 403 Forbidden properly returned",
+    "notes": ""
+  },
+  {
+    "domain": "RBAC Enforcement",
+    "scenario": "Doctor Account Creation Forbidden (POST /doctors)",
+    "status": "PASS",
+    "httpCode": 403,
+    "evidence": "HTTP 403 Forbidden properly returned",
+    "notes": ""
+  },
+  {
+    "domain": "RBAC Enforcement",
+    "scenario": "Department Creation Forbidden (POST /departments)",
+    "status": "PASS",
+    "httpCode": 403,
+    "evidence": "HTTP 403 Forbidden properly returned",
+    "notes": ""
+  },
+  {
+    "domain": "Auth",
+    "scenario": "Receptionist Logout (POST /api/auth/logout)",
+    "status": "PASS",
+    "httpCode": 204,
+    "evidence": "Session invalidated cleanly",
+    "notes": ""
+  },
+  {
+    "domain": "Auth",
+    "scenario": "Post-Logout Refresh Token Rejection",
+    "status": "PASS",
+    "httpCode": 401,
+    "evidence": "HTTP 401 INVALID_REFRESH_TOKEN",
+    "notes": ""
+  }
+]

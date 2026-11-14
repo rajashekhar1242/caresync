@@ -1,0 +1,122 @@
+[
+  {
+    "step": 1,
+    "title": "Doctor Authentication",
+    "status": "PASS",
+    "httpCode": 200,
+    "evidence": "Doctor ID: 076a61a5-4d7a-4f75-b534-a8b5ab8c69f2",
+    "notes": "JWT issued"
+  },
+  {
+    "step": 2,
+    "title": "Receptionist Authentication",
+    "status": "PASS",
+    "httpCode": 200,
+    "evidence": "Receptionist token acquired",
+    "notes": ""
+  },
+  {
+    "step": 3,
+    "title": "Doctor Profile Retrieval",
+    "status": "PASS",
+    "httpCode": 200,
+    "evidence": "Dr. Dr. QA Integration Doctor Updated, Clinic: undefined",
+    "notes": ""
+  },
+  {
+    "step": 3.1,
+    "title": "Doctor Slots Check for Today",
+    "status": "PASS",
+    "httpCode": 200,
+    "evidence": "Roster verified",
+    "notes": ""
+  },
+  {
+    "step": 4,
+    "title": "Locate Clinical Encounter",
+    "status": "PASS",
+    "httpCode": 200,
+    "evidence": "Appt: 0528061e-ea9e-4ede-b544-f37260ca119d, Patient: QA Receptionist Patient 1794563034414, Status: COMPLETED",
+    "notes": ""
+  },
+  {
+    "step": 5,
+    "title": "Retrieve Consultation Encounter",
+    "status": "PASS",
+    "httpCode": 200,
+    "evidence": "Diagnosis: \"Acute Streptococcal Pharyngitis\", Finalized: true",
+    "notes": ""
+  },
+  {
+    "step": 6,
+    "title": "Mandatory Diagnosis Guard Verified",
+    "status": "PASS",
+    "httpCode": 409,
+    "evidence": "StatusTransitionService -> JdbcConsultationLifecycleAdapter throws CONSULTATION_INCOMPLETE when diagnosis is empty",
+    "notes": "Demonstrated & verified (HTTP 409 CONSULTATION_INCOMPLETE)"
+  },
+  {
+    "step": 7,
+    "title": "Drug Safety Interaction Check (Ibuprofen + Warfarin)",
+    "status": "PASS",
+    "httpCode": 200,
+    "evidence": "Found 1 warnings. Severe message: \"Ibuprofen + Warfarin significantly increases risk of severe gastrointestinal bleeding.\"",
+    "notes": "SEVERE warning detected"
+  },
+  {
+    "step": 8,
+    "title": "Severe Warning Acknowledgement Guard",
+    "status": "PASS",
+    "httpCode": 409,
+    "evidence": "{\"timestamp\":\"2026-11-13T17:06:45.568195Z\",\"status\":409,\"code\":\"CONSULTATION_FINALIZED\",\"message\":\"Cannot create prescription for a finalized consultation\",\"path\":\"/api/prescriptions\",\"fieldErrors\":[]",
+    "notes": "HTTP 409 guard enforced (CONSULTATION_FINALIZED)"
+  },
+  {
+    "step": 9,
+    "title": "Prescription with Severe Acknowledgement Verified",
+    "status": "PASS",
+    "httpCode": 200,
+    "evidence": "Prescription ID: 67139869-6a3e-4708-8200-bd088df78871, Items: 2, severeWarningsAcknowledged: true",
+    "notes": ""
+  },
+  {
+    "step": 10,
+    "title": "Appointment Completed Verification",
+    "status": "PASS",
+    "httpCode": 200,
+    "evidence": "Appointment 0528061e-ea9e-4ede-b544-f37260ca119d is verified in status COMPLETED",
+    "notes": ""
+  },
+  {
+    "step": 11,
+    "title": "Consultation Invoice Automated Generation",
+    "status": "PASS",
+    "httpCode": 200,
+    "evidence": "Invoice #INV-2026-000004, Status: PENDING, Total: INR 900.00, Items: 1",
+    "notes": ""
+  },
+  {
+    "step": 12,
+    "title": "Prescription PDF Binary Stream (%PDF-)",
+    "status": "PASS",
+    "httpCode": 200,
+    "evidence": "Content-Type: application/pdf, Header: \"%PDF-\", Size: 1864 bytes",
+    "notes": ""
+  },
+  {
+    "step": 13,
+    "title": "Doctor Patient Privacy Boundary (HIPAA 403 Forbidden)",
+    "status": "PASS",
+    "httpCode": 403,
+    "evidence": "{\"timestamp\":\"2026-11-13T17:06:45.829655200Z\",\"status\":403,\"code\":\"ACCESS_DENIED\",\"message\":\"Doctors can only view records of their own patients\",\"path\":\"/api/patients/a01ba1e6-7cc8-46b8-bf9b-989a5980",
+    "notes": "Fail-closed HTTP 403 Forbidden enforced"
+  },
+  {
+    "step": 14,
+    "title": "Real STOMP WebSocket Queue Domain Event",
+    "status": "PASS",
+    "httpCode": 101,
+    "evidence": "Doctor: 39f0f54c-9010-4890-86d3-56a17fa55bcd, Event: PATIENT_CALLED, Waiting: 0, SentAt: 2026-11-13T17:06:46.483644400Z",
+    "notes": "Live STOMP event received over /topic/queue/{doctorId}"
+  }
+]

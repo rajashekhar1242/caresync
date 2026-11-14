@@ -1,0 +1,457 @@
+[
+  {
+    "section": "20.1.2",
+    "testName": "Admin Login",
+    "status": "PASS",
+    "details": {
+      "userId": "00000000-0000-4000-8000-000000000001",
+      "role": "ADMIN",
+      "expiresIn": 900
+    },
+    "timestamp": "2026-11-13T09:43:45.081Z"
+  },
+  {
+    "section": "20.1.2",
+    "testName": "Session Restoration (/auth/me)",
+    "status": "PASS",
+    "details": {
+      "email": "admin@caresync.local",
+      "role": "ADMIN"
+    },
+    "timestamp": "2026-11-13T09:43:45.095Z"
+  },
+  {
+    "section": "20.1.2",
+    "testName": "Token Refresh & Rotation",
+    "status": "PASS",
+    "details": {
+      "newExpiresIn": 900
+    },
+    "timestamp": "2026-11-13T09:43:45.123Z"
+  },
+  {
+    "section": "20.1.2",
+    "testName": "Receptionist Login",
+    "status": "PASS",
+    "details": {
+      "role": "RECEPTIONIST"
+    },
+    "timestamp": "2026-11-13T09:43:45.207Z"
+  },
+  {
+    "section": "20.1.2",
+    "testName": "RBAC Enforcement: Receptionist 403 on Admin Endpoints",
+    "status": "PASS",
+    "details": {},
+    "timestamp": "2026-11-13T09:43:45.216Z"
+  },
+  {
+    "section": "20.1.2",
+    "testName": "Patient Registration & Login",
+    "status": "PASS",
+    "details": {
+      "email": "qa_live_patient_1794563025216@caresync.local"
+    },
+    "timestamp": "2026-11-13T09:43:45.304Z"
+  },
+  {
+    "section": "20.1.2",
+    "testName": "RBAC Enforcement: Patient 403 on Admin Endpoints",
+    "status": "PASS",
+    "details": {},
+    "timestamp": "2026-11-13T09:43:45.315Z"
+  },
+  {
+    "section": "20.1.3",
+    "testName": "Dashboard Executive Summary API",
+    "status": "PASS",
+    "details": {
+      "clinicId": null,
+      "timeZone": "Asia/Kolkata",
+      "today": "2026-11-13",
+      "generatedAt": "2026-11-13T09:43:45.318564600Z",
+      "appointmentsToday": {
+        "total": 4,
+        "booked": 0,
+        "checkedIn": 2,
+        "inConsultation": 0,
+        "completed": 2,
+        "cancelled": 0,
+        "noShow": 0
+      },
+      "waitingNow": 2,
+      "currency": "INR",
+      "collectedToday": "0.00",
+      "collectedThisMonth": "0.00",
+      "outstandingBalance": "0.00",
+      "unpaidInvoiceCount": 0,
+      "activeDoctors": 5
+    },
+    "timestamp": "2026-11-13T09:43:45.340Z"
+  },
+  {
+    "section": "20.1.3",
+    "testName": "30-Day Revenue Trend API",
+    "status": "PASS",
+    "details": {
+      "bucketsCount": 31,
+      "totals": {
+        "invoiceCount": 0,
+        "invoiced": "0.00",
+        "collected": "0.00",
+        "credited": "0.00",
+        "net": "0.00"
+      }
+    },
+    "timestamp": "2026-11-13T09:43:45.356Z"
+  },
+  {
+    "section": "20.1.3",
+    "testName": "Department Utilization Report API",
+    "status": "PASS",
+    "details": {
+      "departmentsCount": 9
+    },
+    "timestamp": "2026-11-13T09:43:45.368Z"
+  },
+  {
+    "section": "20.1.3",
+    "testName": "30-Day No-Show Rate API",
+    "status": "PASS",
+    "details": {
+      "ratePercent": 0,
+      "completed": 2,
+      "noShow": 0
+    },
+    "timestamp": "2026-11-13T09:43:45.376Z"
+  },
+  {
+    "section": "20.1.3",
+    "testName": "Recent Appointments Ledger API",
+    "status": "PASS",
+    "details": {
+      "retrievedCount": 5
+    },
+    "timestamp": "2026-11-13T09:43:45.396Z"
+  },
+  {
+    "section": "20.1.4",
+    "testName": "List Departments",
+    "status": "PASS",
+    "details": {
+      "count": 9
+    },
+    "timestamp": "2026-11-13T09:43:45.404Z"
+  },
+  {
+    "section": "20.1.4",
+    "testName": "Create Department",
+    "status": "PASS",
+    "details": {
+      "id": "af81232a-1407-4a3a-8d3d-d691e7f38bc1",
+      "name": "QA Phase 20 Department 1794563025396"
+    },
+    "timestamp": "2026-11-13T09:43:45.421Z"
+  },
+  {
+    "section": "20.1.4",
+    "testName": "Duplicate Department 409 Conflict Handling",
+    "status": "PASS",
+    "details": {
+      "code": "DEPARTMENT_NAME_EXISTS"
+    },
+    "timestamp": "2026-11-13T09:43:45.431Z"
+  },
+  {
+    "section": "20.1.4",
+    "testName": "Update Department",
+    "status": "PASS",
+    "details": {
+      "name": "QA Phase 20 Department 1794563025396 Updated"
+    },
+    "timestamp": "2026-11-13T09:43:45.448Z"
+  },
+  {
+    "section": "20.1.5",
+    "testName": "Reference Data (Specializations & Clinics)",
+    "status": "PASS",
+    "details": {
+      "specializations": 8,
+      "clinics": 3
+    },
+    "timestamp": "2026-11-13T09:43:45.465Z"
+  },
+  {
+    "section": "20.1.5",
+    "testName": "Create Doctor",
+    "status": "PASS",
+    "details": {
+      "id": "076a61a5-4d7a-4f75-b534-a8b5ab8c69f2",
+      "name": "Dr. QA Integration Doctor",
+      "fee": "750.00"
+    },
+    "timestamp": "2026-11-13T09:43:45.559Z"
+  },
+  {
+    "section": "20.1.5",
+    "testName": "Get Doctor By ID",
+    "status": "PASS",
+    "details": {
+      "id": "076a61a5-4d7a-4f75-b534-a8b5ab8c69f2"
+    },
+    "timestamp": "2026-11-13T09:43:45.570Z"
+  },
+  {
+    "section": "20.1.5",
+    "testName": "Update Doctor (Fee & Active Status)",
+    "status": "PASS",
+    "details": {
+      "fee": "900.00"
+    },
+    "timestamp": "2026-11-13T09:43:45.597Z"
+  },
+  {
+    "section": "20.1.5",
+    "testName": "Doctor Authentication",
+    "status": "PASS",
+    "details": {
+      "role": "DOCTOR"
+    },
+    "timestamp": "2026-11-13T09:43:45.676Z"
+  },
+  {
+    "section": "20.1.6",
+    "testName": "Create Patient Record",
+    "status": "PASS",
+    "details": {
+      "id": "8ee0dcf0-3ebe-4cfd-99f1-56b4636d1a4a",
+      "phone": "+919879185424"
+    },
+    "timestamp": "2026-11-13T09:43:45.690Z"
+  },
+  {
+    "section": "20.1.6",
+    "testName": "Search Patient by Phone",
+    "status": "PASS",
+    "details": {
+      "found": 1
+    },
+    "timestamp": "2026-11-13T09:43:45.703Z"
+  },
+  {
+    "section": "20.1.6",
+    "testName": "Get Patient by ID",
+    "status": "PASS",
+    "details": {
+      "id": "8ee0dcf0-3ebe-4cfd-99f1-56b4636d1a4a",
+      "allergies": [
+        "Penicillin",
+        "Sulfa"
+      ]
+    },
+    "timestamp": "2026-11-13T09:43:45.719Z"
+  },
+  {
+    "section": "20.1.6",
+    "testName": "Privacy Compliance: PATIENT_READ Audit Event Verified",
+    "status": "PASS",
+    "details": {
+      "auditId": "88c134b4-aad5-4ffc-8e83-75884e2207d5",
+      "actor": "System Administrator",
+      "action": "PATIENT_READ",
+      "occurredAt": "2026-11-13T09:43:45.707493Z"
+    },
+    "timestamp": "2026-11-13T09:43:45.730Z"
+  },
+  {
+    "section": "20.1.7",
+    "testName": "Doctor Weekly Schedule Provisioning",
+    "status": "PASS",
+    "details": {
+      "entriesCount": 7
+    },
+    "timestamp": "2026-11-13T09:43:45.779Z"
+  },
+  {
+    "section": "20.1.7",
+    "testName": "Slot Generation & Availability",
+    "status": "PASS",
+    "details": {
+      "slotCount": 16
+    },
+    "timestamp": "2026-11-13T09:43:45.799Z"
+  },
+  {
+    "section": "20.1.7",
+    "testName": "Book Appointment",
+    "status": "PASS",
+    "details": {
+      "id": "b127c6eb-8590-4d9b-ae6b-d3b04999c391",
+      "status": "BOOKED",
+      "slotStart": "2026-11-14T03:30:00Z"
+    },
+    "timestamp": "2026-11-13T09:43:45.832Z"
+  },
+  {
+    "section": "20.1.7",
+    "testName": "Get Appointment by ID",
+    "status": "PASS",
+    "details": {
+      "status": "BOOKED"
+    },
+    "timestamp": "2026-11-13T09:43:45.843Z"
+  },
+  {
+    "section": "20.1.7",
+    "testName": "Administrative Appointment Cancellation",
+    "status": "PASS",
+    "details": {
+      "status": "CANCELLED",
+      "reason": "Administrative test cancellation by QA engineer"
+    },
+    "timestamp": "2026-11-13T09:43:45.860Z"
+  },
+  {
+    "section": "20.1.7",
+    "testName": "Cancellation Audit Event Verified",
+    "status": "PASS",
+    "details": {},
+    "timestamp": "2026-11-13T09:43:45.866Z"
+  },
+  {
+    "section": "20.1.8",
+    "testName": "List Invoices Ledger",
+    "status": "PASS",
+    "details": {
+      "count": 2
+    },
+    "timestamp": "2026-11-13T09:43:45.880Z"
+  },
+  {
+    "section": "20.1.8",
+    "testName": "Invoice Auto-Creation on Completion",
+    "status": "PASS",
+    "details": {
+      "invoiceNumber": "INV-2026-000003",
+      "status": "PENDING"
+    },
+    "timestamp": "2026-11-13T09:43:46.165Z"
+  },
+  {
+    "section": "20.1.8",
+    "testName": "Financial Semantics (Invoiced vs Collected vs Balance vs Credited)",
+    "status": "PASS",
+    "details": {
+      "invoiced": 900,
+      "collected": 0,
+      "balance": 900,
+      "credited": 0
+    },
+    "timestamp": "2026-11-13T09:43:46.165Z"
+  },
+  {
+    "section": "20.1.8",
+    "testName": "Authenticated PDF Streaming & Valid Header (%PDF)",
+    "status": "PASS",
+    "details": {
+      "byteLength": 1521
+    },
+    "timestamp": "2026-11-13T09:43:46.203Z"
+  },
+  {
+    "section": "20.1.8",
+    "testName": "Void Unpaid Invoice",
+    "status": "PASS",
+    "details": {
+      "status": "VOID"
+    },
+    "timestamp": "2026-11-13T09:43:46.237Z"
+  },
+  {
+    "section": "20.1.9",
+    "testName": "Revenue Analytics (Daily & Monthly Grouping)",
+    "status": "PASS",
+    "details": {
+      "dayBuckets": 365,
+      "monthBuckets": 12
+    },
+    "timestamp": "2026-11-13T09:43:46.268Z"
+  },
+  {
+    "section": "20.1.9",
+    "testName": "Department Utilization Report",
+    "status": "PASS",
+    "details": {
+      "departmentCount": 10
+    },
+    "timestamp": "2026-11-13T09:43:46.278Z"
+  },
+  {
+    "section": "20.1.9",
+    "testName": "No-Show & Attendance Rate Report",
+    "status": "PASS",
+    "details": {
+      "ratePercent": 0,
+      "completed": 3
+    },
+    "timestamp": "2026-11-13T09:43:46.287Z"
+  },
+  {
+    "section": "20.1.9",
+    "testName": "Top Physicians Analytics (Appointments & Revenue Ranking)",
+    "status": "PASS",
+    "details": {},
+    "timestamp": "2026-11-13T09:43:46.312Z"
+  },
+  {
+    "section": "20.1.10",
+    "testName": "Audit Logs Retrieval & Action Filter",
+    "status": "PASS",
+    "details": {
+      "totalElements": 26,
+      "distinctActions": [
+        "INVOICE_VOIDED",
+        "INVOICE_PDF_DOWNLOADED",
+        "INVOICE_READ",
+        "INVOICE_CREATED",
+        "CONSULTATION_FINALIZED",
+        "CONSULTATION_CREATED",
+        "PATIENT_READ"
+      ]
+    },
+    "timestamp": "2026-11-13T09:43:46.329Z"
+  },
+  {
+    "section": "20.1.10",
+    "testName": "Audit Detail Metadata Integrity",
+    "status": "PASS",
+    "details": {
+      "action": "INVOICE_VOIDED",
+      "actor": "System Administrator",
+      "role": "ADMIN",
+      "resource": "INVOICE"
+    },
+    "timestamp": "2026-11-13T09:43:46.329Z"
+  },
+  {
+    "section": "20.1.11",
+    "testName": "401 Unauthorized Rejection on Invalid Token",
+    "status": "PASS",
+    "details": {},
+    "timestamp": "2026-11-13T09:43:46.332Z"
+  },
+  {
+    "section": "20.1.11",
+    "testName": "404 Not Found Handling",
+    "status": "PASS",
+    "details": {},
+    "timestamp": "2026-11-13T09:43:46.343Z"
+  },
+  {
+    "section": "20.1.11",
+    "testName": "400 Validation Error on Invalid Input Length",
+    "status": "PASS",
+    "details": {},
+    "timestamp": "2026-11-13T09:43:46.347Z"
+  }
+]
