@@ -1,0 +1,33 @@
+server:
+  forward-headers-strategy: ${CARESYNC_FORWARD_HEADERS_STRATEGY:native}
+  tomcat:
+    remoteip:
+      protocol-header: ${CARESYNC_FORWARD_PROTO_HEADER:X-Forwarded-Proto}
+      remote-ip-header: ${CARESYNC_FORWARD_IP_HEADER:X-Forwarded-For}
+      internal-proxies: '${CARESYNC_TRUSTED_PROXIES:10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|169\.254\.\d{1,3}\.\d{1,3}|127\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.1[6-9]\.\d{1,3}\.\d{1,3}|172\.2[0-9]\.\d{1,3}\.\d{1,3}|172\.3[0-1]\.\d{1,3}\.\d{1,3}|0:0:0:0:0:0:0:1|::1}'
+
+spring:
+  datasource:
+    hikari:
+      maximum-pool-size: ${SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE:5}
+      minimum-idle: ${SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE:1}
+      connection-timeout: ${SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT:30000}
+      idle-timeout: ${SPRING_DATASOURCE_HIKARI_IDLE_TIMEOUT:600000}
+      max-lifetime: ${SPRING_DATASOURCE_HIKARI_MAX_LIFETIME:1800000}
+
+caresync:
+  cors:
+    allowed-origins: ${CARESYNC_CORS_ORIGINS}
+
+logging:
+  structured:
+    format:
+      console: ecs
+    json:
+      context:
+        include: true
+  level:
+    root: WARN
+    com.caresync: INFO
+    SECURITY_EVENTS: INFO
+    org.springframework.security: WARN

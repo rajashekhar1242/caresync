@@ -1,0 +1,30 @@
+CREATE TABLE audit_logs (
+    id          UUID PRIMARY KEY,
+    occurred_at TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+    user_id     UUID         NOT NULL,
+    user_name   VARCHAR(100) NOT NULL,
+    user_role   VARCHAR(20)  NOT NULL CHECK (user_role IN ('ADMIN', 'RECEPTIONIST', 'DOCTOR', 'PATIENT')),
+    action      VARCHAR(40)  NOT NULL CHECK (action IN (
+        'PATIENT_READ',
+        'CONSULTATION_CREATED',
+        'CONSULTATION_UPDATED',
+        'CONSULTATION_FINALIZED',
+        'CONSULTATION_READ',
+        'PRESCRIPTION_CREATED',
+        'PRESCRIPTION_READ',
+        'PRESCRIPTION_LIST_READ',
+        'PRESCRIPTION_PDF_DOWNLOADED',
+        'INVOICE_CREATED',
+        'INVOICE_READ',
+        'INVOICE_ITEM_ADDED',
+        'PAYMENT_RECORDED',
+        'CREDIT_NOTE_ISSUED',
+        'INVOICE_VOIDED',
+        'INVOICE_PDF_DOWNLOADED'
+    )),
+    entity_type VARCHAR(20)  NOT NULL CHECK (entity_type IN ('PATIENT', 'CONSULTATION', 'PRESCRIPTION', 'INVOICE')),
+    entity_id   UUID         NOT NULL,
+    patient_id  UUID         NULL,
+    details     VARCHAR(500) NULL,
+    ip_address  VARCHAR(64)  NULL
+);
