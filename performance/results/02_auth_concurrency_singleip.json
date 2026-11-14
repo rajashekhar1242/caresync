@@ -1,0 +1,81 @@
+{
+  "runId": 1794496048362,
+  "multiIp": false,
+  "concurrencyLevels": [
+    {
+      "name": "POST /api/auth/login (c=10, single-ip)",
+      "count": 10,
+      "wallMs": 152.55,
+      "rps": 65.55,
+      "minMs": 119.28,
+      "avgMs": 141.57,
+      "p50Ms": 145.53,
+      "p90Ms": 148.36,
+      "p95Ms": 148.65,
+      "p99Ms": 148.65,
+      "maxMs": 148.65,
+      "errors5xx": 0,
+      "transportErrors": 0,
+      "statusCounts": {
+        "200": 10
+      }
+    },
+    {
+      "name": "POST /api/auth/login (c=25, single-ip)",
+      "count": 25,
+      "wallMs": 40.77,
+      "rps": 613.24,
+      "minMs": 20.35,
+      "avgMs": 29.51,
+      "p50Ms": 31.78,
+      "p90Ms": 33.21,
+      "p95Ms": 33.54,
+      "p99Ms": 34.65,
+      "maxMs": 34.65,
+      "errors5xx": 0,
+      "transportErrors": 0,
+      "statusCounts": {
+        "429": 25
+      }
+    },
+    {
+      "name": "POST /api/auth/login (c=50, single-ip)",
+      "count": 50,
+      "wallMs": 62.49,
+      "rps": 800.14,
+      "minMs": 30.52,
+      "avgMs": 48.43,
+      "p50Ms": 50.88,
+      "p90Ms": 53.01,
+      "p95Ms": 53.67,
+      "p99Ms": 53.76,
+      "maxMs": 53.76,
+      "errors5xx": 0,
+      "transportErrors": 0,
+      "statusCounts": {
+        "429": 50
+      }
+    },
+    {
+      "name": "POST /api/auth/login (c=100, single-ip)",
+      "count": 100,
+      "wallMs": 129.53,
+      "rps": 772.02,
+      "minMs": 60.11,
+      "avgMs": 95.62,
+      "p50Ms": 100.28,
+      "p90Ms": 107.79,
+      "p95Ms": 109.55,
+      "p99Ms": 110.05,
+      "maxMs": 110.43,
+      "errors5xx": 0,
+      "transportErrors": 0,
+      "statusCounts": {
+        "429": 100
+      }
+    }
+  ],
+  "refreshRace": null,
+  "replayCheck": null,
+  "logoutRace": null
+}

@@ -1,0 +1,655 @@
+{
+  "runId": 1794495886457,
+  "multiIp": false,
+  "doctorId": "2abee68f-4e31-420c-a17a-99eef9592df2",
+  "summaries": [
+    {
+      "name": "POST /api/auth/register",
+      "count": 4,
+      "wallMs": 491.19,
+      "rps": 8.14,
+      "minMs": 117.67,
+      "avgMs": 122.63,
+      "p50Ms": 119.16,
+      "p90Ms": 129.42,
+      "p95Ms": 129.42,
+      "p99Ms": 129.42,
+      "maxMs": 129.42,
+      "errors5xx": 0,
+      "transportErrors": 0,
+      "statusCounts": {
+        "201": 4
+      }
+    },
+    {
+      "name": "POST /api/auth/login",
+      "count": 5,
+      "wallMs": 491.53,
+      "rps": 10.17,
+      "minMs": 90.61,
+      "avgMs": 98.21,
+      "p50Ms": 93.67,
+      "p90Ms": 117.58,
+      "p95Ms": 117.58,
+      "p99Ms": 117.58,
+      "maxMs": 117.58,
+      "errors5xx": 0,
+      "transportErrors": 0,
+      "statusCounts": {
+        "200": 5
+      }
+    },
+    {
+      "name": "POST /api/auth/refresh",
+      "count": 5,
+      "wallMs": 174.7,
+      "rps": 28.62,
+      "minMs": 31.4,
+      "avgMs": 34.85,
+      "p50Ms": 32.4,
+      "p90Ms": 46.38,
+      "p95Ms": 46.38,
+      "p99Ms": 46.38,
+      "maxMs": 46.38,
+      "errors5xx": 0,
+      "transportErrors": 0,
+      "statusCounts": {
+        "200": 5
+      }
+    },
+    {
+      "name": "POST /api/auth/logout",
+      "count": 5,
+      "wallMs": 94.91,
+      "rps": 52.68,
+      "minMs": 17.89,
+      "avgMs": 18.87,
+      "p50Ms": 18.57,
+      "p90Ms": 20.67,
+      "p95Ms": 20.67,
+      "p99Ms": 20.67,
+      "maxMs": 20.67,
+      "errors5xx": 0,
+      "transportErrors": 0,
+      "statusCounts": {
+        "204": 5
+      }
+    },
+    {
+      "name": "GET /api/doctors",
+      "count": 30,
+      "wallMs": 599.69,
+      "rps": 50.03,
+      "minMs": 15.65,
+      "avgMs": 19.92,
+      "p50Ms": 17.14,
+      "p90Ms": 19.03,
+      "p95Ms": 19.26,
+      "p99Ms": 92.34,
+      "maxMs": 92.34,
+      "errors5xx": 0,
+      "transportErrors": 0,
+      "statusCounts": {
+        "200": 30
+      }
+    },
+    {
+      "name": "GET /api/doctors/{id}/schedules",
+      "count": 30,
+      "wallMs": 564.5,
+      "rps": 53.14,
+      "minMs": 15.6,
+      "avgMs": 18.74,
+      "p50Ms": 17.95,
+      "p90Ms": 23.16,
+      "p95Ms": 23.54,
+      "p99Ms": 29.35,
+      "maxMs": 29.35,
+      "errors5xx": 0,
+      "transportErrors": 0,
+      "statusCounts": {
+        "200": 30
+      }
+    },
+    {
+      "name": "GET /api/doctors/{id}/leaves",
+      "count": 30,
+      "wallMs": 560.09,
+      "rps": 53.56,
+      "minMs": 15.19,
+      "avgMs": 18.58,
+      "p50Ms": 17.99,
+      "p90Ms": 21.17,
+      "p95Ms": 21.3,
+      "p99Ms": 28.26,
+      "maxMs": 28.26,
+      "errors5xx": 0,
+      "transportErrors": 0,
+      "statusCounts": {
+        "200": 30
+      }
+    },
+    {
+      "name": "GET /api/doctors/{id}/slots",
+      "count": 30,
+      "wallMs": 811.51,
+      "rps": 36.97,
+      "minMs": 21.95,
+      "avgMs": 26.96,
+      "p50Ms": 26.31,
+      "p90Ms": 31.31,
+      "p95Ms": 32.92,
+      "p99Ms": 48.95,
+      "maxMs": 48.95,
+      "errors5xx": 0,
+      "transportErrors": 0,
+      "statusCounts": {
+        "200": 30
+      }
+    },
+    {
+      "name": "POST /api/patients",
+      "count": 25,
+      "wallMs": 483.75,
+      "rps": 51.68,
+      "minMs": 15.71,
+      "avgMs": 19.25,
+      "p50Ms": 17.47,
+      "p90Ms": 21.56,
+      "p95Ms": 23.2,
+      "p99Ms": 52.31,
+      "maxMs": 52.31,
+      "errors5xx": 0,
+      "transportErrors": 0,
+      "statusCounts": {
+        "201": 25
+      }
+    },
+    {
+      "name": "GET /api/patients/{id} (audited)",
+      "count": 25,
+      "wallMs": 479.73,
+      "rps": 52.11,
+      "minMs": 17.41,
+      "avgMs": 19.12,
+      "p50Ms": 18.42,
+      "p90Ms": 20.04,
+      "p95Ms": 20.23,
+      "p99Ms": 34.96,
+      "maxMs": 34.96,
+      "errors5xx": 0,
+      "transportErrors": 0,
+      "statusCounts": {
+        "200": 25
+      }
+    },
+    {
+      "name": "GET /api/patients?name=...",
+      "count": 30,
+      "wallMs": 613.05,
+      "rps": 48.94,
+      "minMs": 15.92,
+      "avgMs": 20.35,
+      "p50Ms": 19.18,
+      "p90Ms": 24.81,
+      "p95Ms": 25.08,
+      "p99Ms": 42.52,
+      "maxMs": 42.52,
+      "errors5xx": 0,
+      "transportErrors": 0,
+      "statusCounts": {
+        "200": 30
+      }
+    },
+    {
+      "name": "POST /api/appointments",
+      "count": 25,
+      "wallMs": 1028.82,
+      "rps": 24.3,
+      "minMs": 35.2,
+      "avgMs": 41.06,
+      "p50Ms": 39.33,
+      "p90Ms": 51.03,
+      "p95Ms": 53.95,
+      "p99Ms": 71.44,
+      "maxMs": 71.44,
+      "errors5xx": 0,
+      "transportErrors": 0,
+      "statusCounts": {
+        "201": 25
+      }
+    },
+    {
+      "name": "GET /api/appointments/{id}",
+      "count": 30,
+      "wallMs": 411.41,
+      "rps": 72.92,
+      "minMs": 10.16,
+      "avgMs": 13.64,
+      "p50Ms": 13.01,
+      "p90Ms": 16.62,
+      "p95Ms": 17.51,
+      "p99Ms": 22.29,
+      "maxMs": 22.29,
+      "errors5xx": 0,
+      "transportErrors": 0,
+      "statusCounts": {
+        "200": 30
+      }
+    },
+    {
+      "name": "GET /api/appointments",
+      "count": 30,
+      "wallMs": 652.18,
+      "rps": 46,
+      "minMs": 17.89,
+      "avgMs": 21.65,
+      "p50Ms": 20.57,
+      "p90Ms": 25.65,
+      "p95Ms": 30.12,
+      "p99Ms": 33.99,
+      "maxMs": 33.99,
+      "errors5xx": 0,
+      "transportErrors": 0,
+      "statusCounts": {
+        "200": 30
+      }
+    },
+    {
+      "name": "PATCH /api/appointments/{id}/status (CANCELLED)",
+      "count": 25,
+      "wallMs": 470.44,
+      "rps": 53.14,
+      "minMs": 16.8,
+      "avgMs": 18.74,
+      "p50Ms": 18.39,
+      "p90Ms": 20.06,
+      "p95Ms": 20.16,
+      "p99Ms": 25.58,
+      "maxMs": 25.58,
+      "errors5xx": 0,
+      "transportErrors": 0,
+      "statusCounts": {
+        "200": 25
+      }
+    },
+    {
+      "name": "PATCH /api/appointments/{id}/status (CHECKED_IN)",
+      "count": 15,
+      "wallMs": 717.76,
+      "rps": 20.9,
+      "minMs": 34.61,
+      "avgMs": 47.85,
+      "p50Ms": 41.31,
+      "p90Ms": 46.04,
+      "p95Ms": 148.4,
+      "p99Ms": 148.4,
+      "maxMs": 148.4,
+      "errors5xx": 0,
+      "transportErrors": 0,
+      "statusCounts": {
+        "200": 15
+      }
+    },
+    {
+      "name": "POST /api/queue/doctors/{id}/call-next",
+      "count": 15,
+      "wallMs": 867.08,
+      "rps": 17.3,
+      "minMs": 48.87,
+      "avgMs": 57.81,
+      "p50Ms": 56.42,
+      "p90Ms": 68.51,
+      "p95Ms": 77.76,
+      "p99Ms": 77.76,
+      "maxMs": 77.76,
+      "errors5xx": 0,
+      "transportErrors": 0,
+      "statusCounts": {
+        "200": 15
+      }
+    },
+    {
+      "name": "POST /api/appointments/{id}/consultation",
+      "count": 15,
+      "wallMs": 505.01,
+      "rps": 29.7,
+      "minMs": 25.52,
+      "avgMs": 33.67,
+      "p50Ms": 29.49,
+      "p90Ms": 35.9,
+      "p95Ms": 79.15,
+      "p99Ms": 79.15,
+      "maxMs": 79.15,
+      "errors5xx": 0,
+      "transportErrors": 0,
+      "statusCounts": {
+        "201": 15
+      }
+    },
+    {
+      "name": "GET /api/appointments/{id}/consultation",
+      "count": 15,
+      "wallMs": 384.83,
+      "rps": 38.98,
+      "minMs": 20.99,
+      "avgMs": 25.66,
+      "p50Ms": 24.72,
+      "p90Ms": 30.84,
+      "p95Ms": 32.06,
+      "p99Ms": 32.06,
+      "maxMs": 32.06,
+      "errors5xx": 0,
+      "transportErrors": 0,
+      "statusCounts": {
+        "200": 15
+      }
+    },
+    {
+      "name": "POST /api/prescriptions/check",
+      "count": 15,
+      "wallMs": 338.67,
+      "rps": 44.29,
+      "minMs": 18.25,
+      "avgMs": 22.58,
+      "p50Ms": 20.32,
+      "p90Ms": 24.91,
+      "p95Ms": 48.67,
+      "p99Ms": 48.67,
+      "maxMs": 48.67,
+      "errors5xx": 0,
+      "transportErrors": 0,
+      "statusCounts": {
+        "200": 15
+      }
+    },
+    {
+      "name": "POST /api/prescriptions",
+      "count": 15,
+      "wallMs": 737.49,
+      "rps": 20.34,
+      "minMs": 33.99,
+      "avgMs": 49.17,
+      "p50Ms": 42.71,
+      "p90Ms": 48.34,
+      "p95Ms": 140.44,
+      "p99Ms": 140.44,
+      "maxMs": 140.44,
+      "errors5xx": 0,
+      "transportErrors": 0,
+      "statusCounts": {
+        "201": 15
+      }
+    },
+    {
+      "name": "GET /api/prescriptions/{id}",
+      "count": 15,
+      "wallMs": 407.29,
+      "rps": 36.83,
+      "minMs": 21.38,
+      "avgMs": 27.15,
+      "p50Ms": 26.27,
+      "p90Ms": 30.27,
+      "p95Ms": 44.74,
+      "p99Ms": 44.74,
+      "maxMs": 44.74,
+      "errors5xx": 0,
+      "transportErrors": 0,
+      "statusCounts": {
+        "200": 15
+      }
+    },
+    {
+      "name": "GET /api/prescriptions/{id}/pdf",
+      "count": 15,
+      "wallMs": 689.45,
+      "rps": 21.76,
+      "minMs": 22.91,
+      "avgMs": 45.96,
+      "p50Ms": 29.08,
+      "p90Ms": 51,
+      "p95Ms": 273.62,
+      "p99Ms": 273.62,
+      "maxMs": 273.62,
+      "errors5xx": 0,
+      "transportErrors": 0,
+      "statusCounts": {
+        "200": 15
+      }
+    },
+    {
+      "name": "PATCH /api/appointments/{id}/status (COMPLETED)",
+      "count": 15,
+      "wallMs": 1262.75,
+      "rps": 11.88,
+      "minMs": 64.37,
+      "avgMs": 84.18,
+      "p50Ms": 80.35,
+      "p90Ms": 105.96,
+      "p95Ms": 157.69,
+      "p99Ms": 157.69,
+      "maxMs": 157.69,
+      "errors5xx": 0,
+      "transportErrors": 0,
+      "statusCounts": {
+        "200": 15
+      }
+    },
+    {
+      "name": "GET /api/appointments/{id}/invoice",
+      "count": 15,
+      "wallMs": 578.12,
+      "rps": 25.95,
+      "minMs": 29.53,
+      "avgMs": 38.54,
+      "p50Ms": 35.81,
+      "p90Ms": 42.54,
+      "p95Ms": 78.92,
+      "p99Ms": 78.92,
+      "maxMs": 78.92,
+      "errors5xx": 0,
+      "transportErrors": 0,
+      "statusCounts": {
+        "200": 15
+      }
+    },
+    {
+      "name": "POST /api/invoices/{id}/payments",
+      "count": 15,
+      "wallMs": 506.18,
+      "rps": 29.63,
+      "minMs": 26.3,
+      "avgMs": 33.75,
+      "p50Ms": 32.16,
+      "p90Ms": 34.6,
+      "p95Ms": 69.76,
+      "p99Ms": 69.76,
+      "maxMs": 69.76,
+      "errors5xx": 0,
+      "transportErrors": 0,
+      "statusCounts": {
+        "201": 15
+      }
+    },
+    {
+      "name": "POST /api/invoices/{id}/credit-notes",
+      "count": 15,
+      "wallMs": 532.19,
+      "rps": 28.19,
+      "minMs": 29.07,
+      "avgMs": 35.48,
+      "p50Ms": 33.7,
+      "p90Ms": 41.47,
+      "p95Ms": 49.92,
+      "p99Ms": 49.92,
+      "maxMs": 49.92,
+      "errors5xx": 0,
+      "transportErrors": 0,
+      "statusCounts": {
+        "201": 15
+      }
+    },
+    {
+      "name": "GET /api/invoices/{id}/pdf",
+      "count": 15,
+      "wallMs": 534.55,
+      "rps": 28.06,
+      "minMs": 25.64,
+      "avgMs": 35.64,
+      "p50Ms": 35.16,
+      "p90Ms": 44.5,
+      "p95Ms": 48.84,
+      "p99Ms": 48.84,
+      "maxMs": 48.84,
+      "errors5xx": 0,
+      "transportErrors": 0,
+      "statusCounts": {
+        "200": 15
+      }
+    },
+    {
+      "name": "GET /api/queue/doctors/{id}",
+      "count": 30,
+      "wallMs": 702.76,
+      "rps": 42.69,
+      "minMs": 20.17,
+      "avgMs": 23.36,
+      "p50Ms": 22.98,
+      "p90Ms": 25.28,
+      "p95Ms": 26.8,
+      "p99Ms": 35.76,
+      "maxMs": 35.76,
+      "errors5xx": 0,
+      "transportErrors": 0,
+      "statusCounts": {
+        "200": 30
+      }
+    },
+    {
+      "name": "GET /api/queue/board",
+      "count": 20,
+      "wallMs": 578.93,
+      "rps": 34.55,
+      "minMs": 23.39,
+      "avgMs": 28.87,
+      "p50Ms": 26.43,
+      "p90Ms": 33.86,
+      "p95Ms": 37.17,
+      "p99Ms": 59.21,
+      "maxMs": 59.21,
+      "errors5xx": 0,
+      "transportErrors": 0,
+      "statusCounts": {
+        "200": 20
+      }
+    },
+    {
+      "name": "GET /api/invoices",
+      "count": 30,
+      "wallMs": 430.17,
+      "rps": 69.74,
+      "minMs": 11.43,
+      "avgMs": 14.27,
+      "p50Ms": 13.09,
+      "p90Ms": 16.36,
+      "p95Ms": 18.64,
+      "p99Ms": 29.87,
+      "maxMs": 29.87,
+      "errors5xx": 0,
+      "transportErrors": 0,
+      "statusCounts": {
+        "200": 30
+      }
+    },
+    {
+      "name": "GET /api/reports/revenue?groupBy=DAY",
+      "count": 25,
+      "wallMs": 397.6,
+      "rps": 62.88,
+      "minMs": 12.93,
+      "avgMs": 15.84,
+      "p50Ms": 14.73,
+      "p90Ms": 17.05,
+      "p95Ms": 17.22,
+      "p99Ms": 40.84,
+      "maxMs": 40.84,
+      "errors5xx": 0,
+      "transportErrors": 0,
+      "statusCounts": {
+        "200": 25
+      }
+    },
+    {
+      "name": "GET /api/reports/appointments-by-department",
+      "count": 25,
+      "wallMs": 258.63,
+      "rps": 96.66,
+      "minMs": 8.78,
+      "avgMs": 10.27,
+      "p50Ms": 10.07,
+      "p90Ms": 10.59,
+      "p95Ms": 10.75,
+      "p99Ms": 20.32,
+      "maxMs": 20.32,
+      "errors5xx": 0,
+      "transportErrors": 0,
+      "statusCounts": {
+        "200": 25
+      }
+    },
+    {
+      "name": "GET /api/reports/no-show-rate",
+      "count": 25,
+      "wallMs": 233.52,
+      "rps": 107.06,
+      "minMs": 8.04,
+      "avgMs": 9.28,
+      "p50Ms": 9.04,
+      "p90Ms": 9.65,
+      "p95Ms": 10.03,
+      "p99Ms": 14.74,
+      "maxMs": 14.74,
+      "errors5xx": 0,
+      "transportErrors": 0,
+      "statusCounts": {
+        "200": 25
+      }
+    },
+    {
+      "name": "GET /api/reports/top-doctors",
+      "count": 25,
+      "wallMs": 277.71,
+      "rps": 90.02,
+      "minMs": 9.2,
+      "avgMs": 11.04,
+      "p50Ms": 10.59,
+      "p90Ms": 12.22,
+      "p95Ms": 12.51,
+      "p99Ms": 22.38,
+      "maxMs": 22.38,
+      "errors5xx": 0,
+      "transportErrors": 0,
+      "statusCounts": {
+        "200": 25
+      }
+    },
+    {
+      "name": "GET /api/reports/dashboard",
+      "count": 25,
+      "wallMs": 417.65,
+      "rps": 59.86,
+      "minMs": 14.64,
+      "avgMs": 16.64,
+      "p50Ms": 16.36,
+      "p90Ms": 17.38,
+      "p95Ms": 17.67,
+      "p99Ms": 25.24,
+      "maxMs": 25.24,
+      "errors5xx": 0,
+      "transportErrors": 0,
+      "statusCounts": {
+        "200": 25
+      }
+    }
+  ]
+}

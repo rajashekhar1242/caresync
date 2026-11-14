@@ -1,0 +1,131 @@
+{
+  "runId": 1794496276073,
+  "multiIp": true,
+  "concurrencyLevels": [
+    {
+      "name": "POST /api/auth/login (c=10, multi-ip)",
+      "count": 10,
+      "wallMs": 282.18,
+      "rps": 35.44,
+      "minMs": 125.58,
+      "avgMs": 192.87,
+      "p50Ms": 164.51,
+      "p90Ms": 258.51,
+      "p95Ms": 279.9,
+      "p99Ms": 279.9,
+      "maxMs": 279.9,
+      "errors5xx": 0,
+      "transportErrors": 0,
+      "statusCounts": {
+        "200": 10
+      }
+    },
+    {
+      "name": "POST /api/auth/login (c=25, multi-ip)",
+      "count": 25,
+      "wallMs": 504.77,
+      "rps": 49.53,
+      "minMs": 170.26,
+      "avgMs": 311.86,
+      "p50Ms": 370.72,
+      "p90Ms": 452.93,
+      "p95Ms": 477.08,
+      "p99Ms": 498.33,
+      "maxMs": 498.33,
+      "errors5xx": 0,
+      "transportErrors": 0,
+      "statusCounts": {
+        "200": 25
+      }
+    },
+    {
+      "name": "POST /api/auth/login (c=50, multi-ip)",
+      "count": 50,
+      "wallMs": 903.55,
+      "rps": 55.34,
+      "minMs": 231.26,
+      "avgMs": 528.89,
+      "p50Ms": 479.54,
+      "p90Ms": 790.35,
+      "p95Ms": 859.31,
+      "p99Ms": 891.42,
+      "maxMs": 891.42,
+      "errors5xx": 0,
+      "transportErrors": 0,
+      "statusCounts": {
+        "200": 50
+      }
+    },
+    {
+      "name": "POST /api/auth/login (c=100, multi-ip)",
+      "count": 100,
+      "wallMs": 2149.97,
+      "rps": 46.51,
+      "minMs": 386.42,
+      "avgMs": 1226.42,
+      "p50Ms": 1230.84,
+      "p90Ms": 1943.87,
+      "p95Ms": 2017.11,
+      "p99Ms": 2103.5,
+      "maxMs": 2116.73,
+      "errors5xx": 0,
+      "transportErrors": 0,
+      "statusCounts": {
+        "200": 100
+      }
+    }
+  ],
+  "refreshRace": {
+    "summary": {
+      "name": "POST /api/auth/refresh (same-token 25x race)",
+      "count": 25,
+      "wallMs": 15021.03,
+      "rps": 1.66,
+      "minMs": 44.35,
+      "avgMs": 14416.73,
+      "p50Ms": 15015.64,
+      "p90Ms": 15016.88,
+      "p95Ms": 15017.07,
+      "p99Ms": 15017.18,
+      "maxMs": 15017.18,
+      "errors5xx": 0,
+      "transportErrors": 24,
+      "statusCounts": {
+        "200": 1,
+        "TIMEOUT": 24
+      }
+    },
+    "succeeded200Count": 1,
+    "rejected401Count": 0,
+    "errors5xxCount": 0
+  },
+  "replayCheck": {
+    "oldTokenReplayStatus": "TIMEOUT",
+    "oldTokenReplayCode": null,
+    "rotatedTokenStatusAfterReplayRevocation": 200,
+    "rotatedTokenCode": null
+  },
+  "logoutRace": {
+    "summary": {
+      "name": "Concurrent refresh + logout race (c=20)",
+      "count": 20,
+      "wallMs": 84.6,
+      "rps": 236.4,
+      "minMs": 38.19,
+      "avgMs": 64.89,
+      "p50Ms": 66.52,
+      "p90Ms": 77.83,
+      "p95Ms": 79.07,
+      "p99Ms": 81.22,
+      "maxMs": 81.22,
+      "errors5xx": 0,
+      "transportErrors": 0,
+      "statusCounts": {
+        "204": 10,
+        "401": 10
+      }
+    },
+    "postRaceRefreshStatus": 401,
+    "postRaceRefreshCode": "INVALID_REFRESH_TOKEN"
+  }
+}

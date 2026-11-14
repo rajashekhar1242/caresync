@@ -1,0 +1,199 @@
+{
+  "runId": 1794495969818,
+  "contestedSlotRaces": [
+    {
+      "concurrency": 10,
+      "summary": {
+        "name": "Contested Same-Slot Booking (c=10)",
+        "count": 10,
+        "wallMs": 112.99,
+        "rps": 88.51,
+        "minMs": 53.25,
+        "avgMs": 89.98,
+        "p50Ms": 91.96,
+        "p90Ms": 99.8,
+        "p95Ms": 108.93,
+        "p99Ms": 108.93,
+        "maxMs": 108.93,
+        "errors5xx": 0,
+        "transportErrors": 0,
+        "statusCounts": {
+          "201": 1,
+          "409": 9
+        }
+      },
+      "created201Count": 1,
+      "slotAlreadyBooked409Count": 9,
+      "errors5xxCount": 0,
+      "winnerAppointmentId": "293a85e0-3a3b-439c-bf38-f4542e518030"
+    },
+    {
+      "concurrency": 25,
+      "summary": {
+        "name": "Contested Same-Slot Booking (c=25)",
+        "count": 25,
+        "wallMs": 213.02,
+        "rps": 117.36,
+        "minMs": 63.88,
+        "avgMs": 153.47,
+        "p50Ms": 161.51,
+        "p90Ms": 202.15,
+        "p95Ms": 203.83,
+        "p99Ms": 209.54,
+        "maxMs": 209.54,
+        "errors5xx": 0,
+        "transportErrors": 0,
+        "statusCounts": {
+          "201": 1,
+          "409": 24
+        }
+      },
+      "created201Count": 1,
+      "slotAlreadyBooked409Count": 24,
+      "errors5xxCount": 0,
+      "winnerAppointmentId": "c9bcc469-2b10-4907-83df-033b6495556f"
+    },
+    {
+      "concurrency": 50,
+      "summary": {
+        "name": "Contested Same-Slot Booking (c=50)",
+        "count": 50,
+        "wallMs": 330.89,
+        "rps": 151.11,
+        "minMs": 120.9,
+        "avgMs": 208.55,
+        "p50Ms": 203.59,
+        "p90Ms": 280.51,
+        "p95Ms": 287.61,
+        "p99Ms": 319.52,
+        "maxMs": 319.52,
+        "errors5xx": 0,
+        "transportErrors": 0,
+        "statusCounts": {
+          "201": 1,
+          "409": 49
+        }
+      },
+      "created201Count": 1,
+      "slotAlreadyBooked409Count": 49,
+      "errors5xxCount": 0,
+      "winnerAppointmentId": "6575bc1b-d6dd-436e-8636-b4ace5871189"
+    },
+    {
+      "concurrency": 100,
+      "summary": {
+        "name": "Contested Same-Slot Booking (c=100)",
+        "count": 100,
+        "wallMs": 655.91,
+        "rps": 152.46,
+        "minMs": 286.41,
+        "avgMs": 499.02,
+        "p50Ms": 527.54,
+        "p90Ms": 616.75,
+        "p95Ms": 620.36,
+        "p99Ms": 631.26,
+        "maxMs": 634.26,
+        "errors5xx": 0,
+        "transportErrors": 0,
+        "statusCounts": {
+          "201": 1,
+          "409": 99
+        }
+      },
+      "created201Count": 1,
+      "slotAlreadyBooked409Count": 99,
+      "errors5xxCount": 0,
+      "winnerAppointmentId": "35b513dc-5b60-4066-ac59-beb38110f344"
+    }
+  ],
+  "uncontestedParallelBookings": {
+    "summary": {
+      "name": "Parallel Distinct-Slot Bookings (c=50, 4 doctors)",
+      "count": 50,
+      "wallMs": 388.13,
+      "rps": 128.82,
+      "minMs": 153.96,
+      "avgMs": 279.94,
+      "p50Ms": 295.88,
+      "p90Ms": 363.41,
+      "p95Ms": 372.55,
+      "p99Ms": 378,
+      "maxMs": 378,
+      "errors5xx": 0,
+      "transportErrors": 0,
+      "statusCounts": {
+        "201": 50
+      }
+    },
+    "created201Count": 50
+  },
+  "cancelVsBookRace": {
+    "name": "Concurrent Cancel vs Rebook (10 pairs, c=20)",
+    "count": 20,
+    "wallMs": 115.85,
+    "rps": 172.64,
+    "minMs": 58.34,
+    "avgMs": 86.53,
+    "p50Ms": 82.24,
+    "p90Ms": 109.36,
+    "p95Ms": 110.74,
+    "p99Ms": 112.97,
+    "maxMs": 112.97,
+    "errors5xx": 0,
+    "transportErrors": 0,
+    "statusCounts": {
+      "200": 10,
+      "201": 9,
+      "409": 1
+    }
+  },
+  "concurrentCheckInTokens": {
+    "summary": {
+      "name": "Concurrent Check-In Token Assignment (c=25)",
+      "count": 25,
+      "wallMs": 15011.24,
+      "rps": 1.67,
+      "minMs": 15004.86,
+      "avgMs": 15006.34,
+      "p50Ms": 15006.9,
+      "p90Ms": 15007.17,
+      "p95Ms": 15007.18,
+      "p99Ms": 15007.19,
+      "maxMs": 15007.19,
+      "errors5xx": 0,
+      "transportErrors": 25,
+      "statusCounts": {
+        "TIMEOUT": 25
+      }
+    },
+    "issuedTokenCount": 0,
+    "uniqueTokenCount": 0,
+    "tokensContiguousFrom1": false,
+    "minToken": null,
+    "maxToken": null
+  },
+  "sameAppointmentStatusRace": null,
+  "concurrentCallNextRace": {
+    "summary": {
+      "name": "Concurrent Queue call-next Race (c=10)",
+      "count": 10,
+      "wallMs": 230.22,
+      "rps": 43.44,
+      "minMs": 212.96,
+      "avgMs": 218.68,
+      "p50Ms": 218.19,
+      "p90Ms": 220.61,
+      "p95Ms": 229.99,
+      "p99Ms": 229.99,
+      "maxMs": 229.99,
+      "errors5xx": 0,
+      "transportErrors": 0,
+      "statusCounts": {
+        "200": 1,
+        "409": 9
+      }
+    },
+    "succeeded200Count": 1,
+    "conflict409Count": 9
+  }
+}

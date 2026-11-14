@@ -1,0 +1,372 @@
+{
+    "hikaricp.connections.usage":  {
+                                       "availableTags":  [
+                                                             {
+                                                                 "tag":  "pool",
+                                                                 "values":  [
+                                                                                "HikariPool-1"
+                                                                            ]
+                                                             }
+                                                         ],
+                                       "baseUnit":  "seconds",
+                                       "description":  "Connection usage time",
+                                       "measurements":  [
+                                                            {
+                                                                "statistic":  "COUNT",
+                                                                "value":  1329.0
+                                                            },
+                                                            {
+                                                                "statistic":  "TOTAL_TIME",
+                                                                "value":  648.418
+                                                            },
+                                                            {
+                                                                "statistic":  "MAX",
+                                                                "value":  30.186
+                                                            }
+                                                        ],
+                                       "name":  "hikaricp.connections.usage"
+                                   },
+    "hikaricp.connections.active":  {
+                                        "availableTags":  [
+                                                              {
+                                                                  "tag":  "pool",
+                                                                  "values":  [
+                                                                                 "HikariPool-1"
+                                                                             ]
+                                                              }
+                                                          ],
+                                        "description":  "Active connections",
+                                        "measurements":  [
+                                                             {
+                                                                 "statistic":  "VALUE",
+                                                                 "value":  0.0
+                                                             }
+                                                         ],
+                                        "name":  "hikaricp.connections.active"
+                                    },
+    "jvm.memory.max":  {
+                           "availableTags":  [
+                                                 {
+                                                     "tag":  "area",
+                                                     "values":  [
+                                                                    "heap",
+                                                                    "nonheap"
+                                                                ]
+                                                 },
+                                                 {
+                                                     "tag":  "id",
+                                                     "values":  [
+                                                                    "CodeHeap \u0027profiled nmethods\u0027",
+                                                                    "G1 Old Gen",
+                                                                    "CodeHeap \u0027non-profiled nmethods\u0027",
+                                                                    "G1 Survivor Space",
+                                                                    "Compressed Class Space",
+                                                                    "Metaspace",
+                                                                    "G1 Eden Space",
+                                                                    "CodeHeap \u0027non-nmethods\u0027"
+                                                                ]
+                                                 }
+                                             ],
+                           "baseUnit":  "bytes",
+                           "description":  "The maximum amount of memory in bytes that can be used for memory management",
+                           "measurements":  [
+                                                {
+                                                    "statistic":  "VALUE",
+                                                    "value":  5456789501
+                                                }
+                                            ],
+                           "name":  "jvm.memory.max"
+                       },
+    "http.server.requests":  {
+                                 "availableTags":  [
+                                                       {
+                                                           "tag":  "exception",
+                                                           "values":  [
+                                                                          "none"
+                                                                      ]
+                                                       },
+                                                       {
+                                                           "tag":  "method",
+                                                           "values":  [
+                                                                          "POST",
+                                                                          "PATCH",
+                                                                          "PUT",
+                                                                          "GET"
+                                                                      ]
+                                                       },
+                                                       {
+                                                           "tag":  "error",
+                                                           "values":  [
+                                                                          "none"
+                                                                      ]
+                                                       },
+                                                       {
+                                                           "tag":  "uri",
+                                                           "values":  [
+                                                                          "/api/doctors/{doctorId}/schedules",
+                                                                          "/api/auth/register",
+                                                                          "/api/appointments/{appointmentId}/consultation",
+                                                                          "/api/auth/login",
+                                                                          "/api/invoices/{invoiceId}/payments",
+                                                                          "/api/prescriptions/{prescriptionId}/pdf",
+                                                                          "/api/appointments/{appointmentId}/invoice",
+                                                                          "/actuator/metrics/{requiredMetricName}",
+                                                                          "/api/queue/doctors/{doctorId}/call-next",
+                                                                          "/api/prescriptions/{prescriptionId}",
+                                                                          "/api/auth/refresh",
+                                                                          "/api/reports/revenue",
+                                                                          "/api/prescriptions/check",
+                                                                          "/api/patients",
+                                                                          "/api/invoices/{invoiceId}/pdf",
+                                                                          "/api/invoices/{invoiceId}/credit-notes",
+                                                                          "/api/reports/top-doctors",
+                                                                          "/api/doctors",
+                                                                          "/api/doctors/{doctorId}/leaves",
+                                                                          "/api/invoices",
+                                                                          "/api/reports/no-show-rate",
+                                                                          "/api/prescriptions",
+                                                                          "/api/appointments/{appointmentId}/status",
+                                                                          "/api/auth/logout",
+                                                                          "/api/reports/dashboard",
+                                                                          "/ws/**",
+                                                                          "/api/appointments/{appointmentId}",
+                                                                          "/api/doctors/{doctorId}/slots",
+                                                                          "/api/appointments",
+                                                                          "/api/patients/{patientId}",
+                                                                          "/api/queue/board",
+                                                                          "/actuator/health",
+                                                                          "UNKNOWN",
+                                                                          "/api/reports/appointments-by-department",
+                                                                          "/api/queue/doctors/{doctorId}"
+                                                                      ]
+                                                       },
+                                                       {
+                                                           "tag":  "outcome",
+                                                           "values":  [
+                                                                          "CLIENT_ERROR",
+                                                                          "SUCCESS",
+                                                                          "SERVER_ERROR",
+                                                                          "INFORMATIONAL"
+                                                                      ]
+                                                       },
+                                                       {
+                                                           "tag":  "status",
+                                                           "values":  [
+                                                                          "200",
+                                                                          "101",
+                                                                          "201",
+                                                                          "500",
+                                                                          "204",
+                                                                          "503",
+                                                                          "429",
+                                                                          "409"
+                                                                      ]
+                                                       }
+                                                   ],
+                                 "baseUnit":  "seconds",
+                                 "measurements":  [
+                                                      {
+                                                          "statistic":  "COUNT",
+                                                          "value":  1681.0
+                                                      },
+                                                      {
+                                                          "statistic":  "TOTAL_TIME",
+                                                          "value":  847.3638785999998
+                                                      },
+                                                      {
+                                                          "statistic":  "MAX",
+                                                          "value":  30.1945207
+                                                      }
+                                                  ],
+                                 "name":  "http.server.requests"
+                             },
+    "jvm.threads.live":  {
+                             "availableTags":  [
+
+                                               ],
+                             "baseUnit":  "threads",
+                             "description":  "The current number of live threads including both daemon and non-daemon threads",
+                             "measurements":  [
+                                                  {
+                                                      "statistic":  "VALUE",
+                                                      "value":  41.0
+                                                  }
+                                              ],
+                             "name":  "jvm.threads.live"
+                         },
+    "hikaricp.connections.pending":  {
+                                         "availableTags":  [
+                                                               {
+                                                                   "tag":  "pool",
+                                                                   "values":  [
+                                                                                  "HikariPool-1"
+                                                                              ]
+                                                               }
+                                                           ],
+                                         "description":  "Pending threads",
+                                         "measurements":  [
+                                                              {
+                                                                  "statistic":  "VALUE",
+                                                                  "value":  0.0
+                                                              }
+                                                          ],
+                                         "name":  "hikaricp.connections.pending"
+                                     },
+    "jvm.memory.used":  {
+                            "availableTags":  [
+                                                  {
+                                                      "tag":  "area",
+                                                      "values":  [
+                                                                     "heap",
+                                                                     "nonheap"
+                                                                 ]
+                                                  },
+                                                  {
+                                                      "tag":  "id",
+                                                      "values":  [
+                                                                     "CodeHeap \u0027profiled nmethods\u0027",
+                                                                     "G1 Old Gen",
+                                                                     "G1 Survivor Space",
+                                                                     "CodeHeap \u0027non-profiled nmethods\u0027",
+                                                                     "Compressed Class Space",
+                                                                     "Metaspace",
+                                                                     "G1 Eden Space",
+                                                                     "CodeHeap \u0027non-nmethods\u0027"
+                                                                 ]
+                                                  }
+                                              ],
+                            "baseUnit":  "bytes",
+                            "description":  "The amount of used memory",
+                            "measurements":  [
+                                                 {
+                                                     "statistic":  "VALUE",
+                                                     "value":  289555808
+                                                 }
+                                             ],
+                            "name":  "jvm.memory.used"
+                        },
+    "jvm.threads.peak":  {
+                             "availableTags":  [
+
+                                               ],
+                             "baseUnit":  "threads",
+                             "description":  "The peak live thread count since the Java virtual machine started or peak was reset",
+                             "measurements":  [
+                                                  {
+                                                      "statistic":  "VALUE",
+                                                      "value":  109.0
+                                                  }
+                                              ],
+                             "name":  "jvm.threads.peak"
+                         },
+    "jvm.gc.pause":  {
+                         "availableTags":  [
+                                               {
+                                                   "tag":  "cause",
+                                                   "values":  [
+                                                                  "G1 Evacuation Pause"
+                                                              ]
+                                               },
+                                               {
+                                                   "tag":  "action",
+                                                   "values":  [
+                                                                  "end of minor GC"
+                                                              ]
+                                               },
+                                               {
+                                                   "tag":  "gc",
+                                                   "values":  [
+                                                                  "G1 Young Generation"
+                                                              ]
+                                               }
+                                           ],
+                         "baseUnit":  "seconds",
+                         "description":  "Time spent in GC pause",
+                         "measurements":  [
+                                              {
+                                                  "statistic":  "COUNT",
+                                                  "value":  6.0
+                                              },
+                                              {
+                                                  "statistic":  "TOTAL_TIME",
+                                                  "value":  0.06
+                                              },
+                                              {
+                                                  "statistic":  "MAX",
+                                                  "value":  0.01
+                                              }
+                                          ],
+                         "name":  "jvm.gc.pause"
+                     },
+    "process.cpu.usage":  {
+                              "availableTags":  [
+
+                                                ],
+                              "description":  "The \"recent cpu usage\" for the Java Virtual Machine process",
+                              "measurements":  [
+                                                   {
+                                                       "statistic":  "VALUE",
+                                                       "value":  0.0781502164698476
+                                                   }
+                                               ],
+                              "name":  "process.cpu.usage"
+                          },
+    "system.cpu.usage":  {
+                             "availableTags":  [
+
+                                               ],
+                             "description":  "The \"recent cpu usage\" of the system the application is running in",
+                             "measurements":  [
+                                                  {
+                                                      "statistic":  "VALUE",
+                                                      "value":  0.2398299939283546
+                                                  }
+                                              ],
+                             "name":  "system.cpu.usage"
+                         },
+    "hikaricp.connections.idle":  {
+                                      "availableTags":  [
+                                                            {
+                                                                "tag":  "pool",
+                                                                "values":  [
+                                                                               "HikariPool-1"
+                                                                           ]
+                                                            }
+                                                        ],
+                                      "description":  "Idle connections",
+                                      "measurements":  [
+                                                           {
+                                                               "statistic":  "VALUE",
+                                                               "value":  20.0
+                                                           }
+                                                       ],
+                                      "name":  "hikaricp.connections.idle"
+                                  },
+    "hikaricp.connections.acquire":  {
+                                         "availableTags":  [
+                                                               {
+                                                                   "tag":  "pool",
+                                                                   "values":  [
+                                                                                  "HikariPool-1"
+                                                                              ]
+                                                               }
+                                                           ],
+                                         "baseUnit":  "seconds",
+                                         "description":  "Connection acquire time",
+                                         "measurements":  [
+                                                              {
+                                                                  "statistic":  "COUNT",
+                                                                  "value":  1335.0
+                                                              },
+                                                              {
+                                                                  "statistic":  "TOTAL_TIME",
+                                                                  "value":  788.2764552
+                                                              },
+                                                              {
+                                                                  "statistic":  "MAX",
+                                                                  "value":  30.0057874
+                                                              }
+                                                          ],
+                                         "name":  "hikaricp.connections.acquire"
+                                     }
+}

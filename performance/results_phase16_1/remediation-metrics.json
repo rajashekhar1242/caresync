@@ -1,0 +1,188 @@
+{
+    "http.server.requests":  {
+                                 "availableTags":  [
+                                                       {
+                                                           "tag":  "exception",
+                                                           "values":  [
+                                                                          "none"
+                                                                      ]
+                                                       },
+                                                       {
+                                                           "tag":  "method",
+                                                           "values":  [
+                                                                          "POST",
+                                                                          "PATCH",
+                                                                          "PUT",
+                                                                          "GET"
+                                                                      ]
+                                                       },
+                                                       {
+                                                           "tag":  "error",
+                                                           "values":  [
+                                                                          "none"
+                                                                      ]
+                                                       },
+                                                       {
+                                                           "tag":  "uri",
+                                                           "values":  [
+                                                                          "/api/auth/register",
+                                                                          "/api/doctors/{doctorId}/schedules",
+                                                                          "/api/doctors",
+                                                                          "/api/auth/login",
+                                                                          "/api/appointments/{appointmentId}/status",
+                                                                          "/api/auth/logout",
+                                                                          "/actuator/metrics/{requiredMetricName}",
+                                                                          "/api/queue/doctors/{doctorId}/call-next",
+                                                                          "/api/auth/refresh",
+                                                                          "/api/doctors/{doctorId}/slots",
+                                                                          "/api/patients",
+                                                                          "/api/appointments",
+                                                                          "/actuator/health"
+                                                                      ]
+                                                       },
+                                                       {
+                                                           "tag":  "outcome",
+                                                           "values":  [
+                                                                          "CLIENT_ERROR",
+                                                                          "SUCCESS",
+                                                                          "SERVER_ERROR"
+                                                                      ]
+                                                       },
+                                                       {
+                                                           "tag":  "status",
+                                                           "values":  [
+                                                                          "503",
+                                                                          "200",
+                                                                          "201",
+                                                                          "401",
+                                                                          "409",
+                                                                          "204"
+                                                                      ]
+                                                       }
+                                                   ],
+                                 "baseUnit":  "seconds",
+                                 "measurements":  [
+                                                      {
+                                                          "statistic":  "COUNT",
+                                                          "value":  731.0
+                                                      },
+                                                      {
+                                                          "statistic":  "TOTAL_TIME",
+                                                          "value":  243.49459119999997
+                                                      },
+                                                      {
+                                                          "statistic":  "MAX",
+                                                          "value":  1.5364068
+                                                      }
+                                                  ],
+                                 "name":  "http.server.requests"
+                             },
+    "hikaricp.connections.acquire":  {
+                                         "availableTags":  [
+                                                               {
+                                                                   "tag":  "pool",
+                                                                   "values":  [
+                                                                                  "HikariPool-1"
+                                                                              ]
+                                                               }
+                                                           ],
+                                         "baseUnit":  "seconds",
+                                         "description":  "Connection acquire time",
+                                         "measurements":  [
+                                                              {
+                                                                  "statistic":  "COUNT",
+                                                                  "value":  755.0
+                                                              },
+                                                              {
+                                                                  "statistic":  "TOTAL_TIME",
+                                                                  "value":  112.4567857
+                                                              },
+                                                              {
+                                                                  "statistic":  "MAX",
+                                                                  "value":  1.2862168
+                                                              }
+                                                          ],
+                                         "name":  "hikaricp.connections.acquire"
+                                     },
+    "hikaricp.connections.usage":  {
+                                       "availableTags":  [
+                                                             {
+                                                                 "tag":  "pool",
+                                                                 "values":  [
+                                                                                "HikariPool-1"
+                                                                            ]
+                                                             }
+                                                         ],
+                                       "baseUnit":  "seconds",
+                                       "description":  "Connection usage time",
+                                       "measurements":  [
+                                                            {
+                                                                "statistic":  "COUNT",
+                                                                "value":  755.0
+                                                            },
+                                                            {
+                                                                "statistic":  "TOTAL_TIME",
+                                                                "value":  121.405
+                                                            },
+                                                            {
+                                                                "statistic":  "MAX",
+                                                                "value":  0.846
+                                                            }
+                                                        ],
+                                       "name":  "hikaricp.connections.usage"
+                                   },
+    "hikaricp.connections.idle":  {
+                                      "availableTags":  [
+                                                            {
+                                                                "tag":  "pool",
+                                                                "values":  [
+                                                                               "HikariPool-1"
+                                                                           ]
+                                                            }
+                                                        ],
+                                      "description":  "Idle connections",
+                                      "measurements":  [
+                                                           {
+                                                               "statistic":  "VALUE",
+                                                               "value":  20.0
+                                                           }
+                                                       ],
+                                      "name":  "hikaricp.connections.idle"
+                                  },
+    "hikaricp.connections.pending":  {
+                                         "availableTags":  [
+                                                               {
+                                                                   "tag":  "pool",
+                                                                   "values":  [
+                                                                                  "HikariPool-1"
+                                                                              ]
+                                                               }
+                                                           ],
+                                         "description":  "Pending threads",
+                                         "measurements":  [
+                                                              {
+                                                                  "statistic":  "VALUE",
+                                                                  "value":  0.0
+                                                              }
+                                                          ],
+                                         "name":  "hikaricp.connections.pending"
+                                     },
+    "hikaricp.connections.active":  {
+                                        "availableTags":  [
+                                                              {
+                                                                  "tag":  "pool",
+                                                                  "values":  [
+                                                                                 "HikariPool-1"
+                                                                             ]
+                                                              }
+                                                          ],
+                                        "description":  "Active connections",
+                                        "measurements":  [
+                                                             {
+                                                                 "statistic":  "VALUE",
+                                                                 "value":  0.0
+                                                             }
+                                                         ],
+                                        "name":  "hikaricp.connections.active"
+                                    }
+}
