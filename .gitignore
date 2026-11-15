@@ -25,6 +25,9 @@ deploy/test-certs/
 backups/
 *.dump
 
+# Local documentation archive
+archive/
+
 # IDE & OS
 .idea/
 *.iml
