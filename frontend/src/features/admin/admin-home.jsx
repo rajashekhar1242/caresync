@@ -10,6 +10,7 @@ import {
   ArrowRight,
   TrendingUp,
   AlertCircle,
+  CheckCircle2,
   FileBarChart,
   ShieldCheck,
   RefreshCw,
@@ -41,6 +42,7 @@ import { useDoctors } from '@/hooks/use-doctors';
 import { usePatients } from '@/hooks/use-patients';
 import { useDepartments } from '@/hooks/use-departments';
 import { useAuditLogs } from '@/hooks/use-audit';
+import { getClinicTodayDateString } from '@/lib/utils';
 
 const STATUS_COLORS = {
   BOOKED: '#0284c7', // Sky 600
@@ -63,7 +65,7 @@ export function AdminHome() {
 
   // Date range for reports (last 7 days)
   const todayStr = React.useMemo(() => {
-    return dashboardQuery.data?.today || new Date().toISOString().split('T')[0];
+    return dashboardQuery.data?.today || getClinicTodayDateString();
   }, [dashboardQuery.data?.today]);
 
   const sevenDaysAgoStr = React.useMemo(() => {
@@ -172,132 +174,192 @@ export function AdminHome() {
       </div>
 
       {/* KPI Cards Grid */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-        {/* 1. Total Doctors */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-medium text-muted-foreground">Total Doctors</CardTitle>
-            <Stethoscope className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent>
-            {doctorsQuery.isLoading ? (
-              <Skeleton className="h-7 w-16" />
-            ) : doctorsQuery.isError ? (
-              <div className="text-sm font-semibold text-destructive">N/A</div>
-            ) : (
-              <div className="text-2xl font-bold text-foreground">
-                {doctorsQuery.data?.totalElements ?? dashboardQuery.data?.activeDoctors ?? 0}
-              </div>
-            )}
-            <p className="text-[11px] text-muted-foreground mt-1">
-              {dashboardQuery.data?.activeDoctors != null ? `${dashboardQuery.data.activeDoctors} Active on duty` : 'Physicians'}
-            </p>
-          </CardContent>
-        </Card>
+      <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-8">
+        {/* 1. Total Patients */}
+        <Link to="/admin/patients" className="block focus:outline-none focus:ring-2 focus:ring-primary rounded-lg">
+          <Card className="hover:border-primary/50 hover:bg-muted/30 transition-colors h-full">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-xs font-medium text-muted-foreground">Total Patients</CardTitle>
+              <Users className="h-4 w-4 text-sky-600" />
+            </CardHeader>
+            <CardContent>
+              {patientsQuery.isLoading ? (
+                <Skeleton className="h-7 w-16" />
+              ) : patientsQuery.isError ? (
+                <div className="text-sm font-semibold text-destructive">N/A</div>
+              ) : (
+                <div className="text-2xl font-bold text-foreground">
+                  {patientsQuery.data?.totalElements ?? 0}
+                </div>
+              )}
+              <p className="text-[11px] text-muted-foreground mt-1">Directory count</p>
+            </CardContent>
+          </Card>
+        </Link>
 
-        {/* 2. Total Patients */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-medium text-muted-foreground">Total Patients</CardTitle>
-            <Users className="h-4 w-4 text-sky-600" />
-          </CardHeader>
-          <CardContent>
-            {patientsQuery.isLoading ? (
-              <Skeleton className="h-7 w-16" />
-            ) : patientsQuery.isError ? (
-              <div className="text-sm font-semibold text-destructive">N/A</div>
-            ) : (
-              <div className="text-2xl font-bold text-foreground">
-                {patientsQuery.data?.totalElements ?? 0}
-              </div>
-            )}
-            <p className="text-[11px] text-muted-foreground mt-1">Registered in directory</p>
-          </CardContent>
-        </Card>
+        {/* 2. Total Doctors */}
+        <Link to="/admin/doctors" className="block focus:outline-none focus:ring-2 focus:ring-primary rounded-lg">
+          <Card className="hover:border-primary/50 hover:bg-muted/30 transition-colors h-full">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-xs font-medium text-muted-foreground">Total Doctors</CardTitle>
+              <Stethoscope className="h-4 w-4 text-primary" />
+            </CardHeader>
+            <CardContent>
+              {doctorsQuery.isLoading ? (
+                <Skeleton className="h-7 w-16" />
+              ) : doctorsQuery.isError ? (
+                <div className="text-sm font-semibold text-destructive">N/A</div>
+              ) : (
+                <div className="text-2xl font-bold text-foreground">
+                  {doctorsQuery.data?.totalElements ?? dashboardQuery.data?.activeDoctors ?? 0}
+                </div>
+              )}
+              <p className="text-[11px] text-muted-foreground mt-1">
+                {dashboardQuery.data?.activeDoctors != null ? `${dashboardQuery.data.activeDoctors} Active on duty` : 'Physicians'}
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
 
         {/* 3. Total Appointments */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-medium text-muted-foreground">Total Bookings</CardTitle>
-            <Calendar className="h-4 w-4 text-violet-600" />
-          </CardHeader>
-          <CardContent>
-            {appointmentsQuery.isLoading ? (
-              <Skeleton className="h-7 w-16" />
-            ) : appointmentsQuery.isError ? (
-              <div className="text-sm font-semibold text-destructive">N/A</div>
-            ) : (
-              <div className="text-2xl font-bold text-foreground">
-                {appointmentsQuery.data?.totalElements ?? 0}
-              </div>
-            )}
-            <p className="text-[11px] text-muted-foreground mt-1">All-time appointments</p>
-          </CardContent>
-        </Card>
+        <Link to="/admin/appointments" className="block focus:outline-none focus:ring-2 focus:ring-primary rounded-lg">
+          <Card className="hover:border-primary/50 hover:bg-muted/30 transition-colors h-full">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-xs font-medium text-muted-foreground">Total Bookings</CardTitle>
+              <Calendar className="h-4 w-4 text-violet-600" />
+            </CardHeader>
+            <CardContent>
+              {appointmentsQuery.isLoading ? (
+                <Skeleton className="h-7 w-16" />
+              ) : appointmentsQuery.isError ? (
+                <div className="text-sm font-semibold text-destructive">N/A</div>
+              ) : (
+                <div className="text-2xl font-bold text-foreground">
+                  {appointmentsQuery.data?.totalElements ?? 0}
+                </div>
+              )}
+              <p className="text-[11px] text-muted-foreground mt-1">All-time bookings</p>
+            </CardContent>
+          </Card>
+        </Link>
 
         {/* 4. Today's Appointments */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-medium text-muted-foreground">Today's Schedule</CardTitle>
-            <Clock className="h-4 w-4 text-amber-500" />
-          </CardHeader>
-          <CardContent>
-            {dashboardQuery.isLoading ? (
-              <Skeleton className="h-7 w-16" />
-            ) : dashboardQuery.isError ? (
-              <div className="text-sm font-semibold text-destructive">N/A</div>
-            ) : (
-              <div className="text-2xl font-bold text-foreground">
-                {dashboardQuery.data?.appointmentsToday?.total ?? 0}
-              </div>
-            )}
-            <p className="text-[11px] text-muted-foreground mt-1">
-              {dashboardQuery.data?.waitingNow != null ? `${dashboardQuery.data.waitingNow} in waiting room` : 'Today'}
-            </p>
-          </CardContent>
-        </Card>
+        <Link to={`/admin/appointments?fromDate=${todayStr}&toDate=${todayStr}`} className="block focus:outline-none focus:ring-2 focus:ring-primary rounded-lg">
+          <Card className="hover:border-primary/50 hover:bg-muted/30 transition-colors h-full">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-xs font-medium text-muted-foreground">Today's Schedule</CardTitle>
+              <Clock className="h-4 w-4 text-amber-500" />
+            </CardHeader>
+            <CardContent>
+              {dashboardQuery.isLoading ? (
+                <Skeleton className="h-7 w-16" />
+              ) : dashboardQuery.isError ? (
+                <div className="text-sm font-semibold text-destructive">N/A</div>
+              ) : (
+                <div className="text-2xl font-bold text-foreground">
+                  {dashboardQuery.data?.appointmentsToday?.total ?? 0}
+                </div>
+              )}
+              <p className="text-[11px] text-muted-foreground mt-1">
+                {dashboardQuery.data?.waitingNow != null ? `${dashboardQuery.data.waitingNow} in waiting room` : 'Today'}
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
 
-        {/* 5. Total Departments */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-medium text-muted-foreground">Departments</CardTitle>
-            <Building2 className="h-4 w-4 text-emerald-600" />
-          </CardHeader>
-          <CardContent>
-            {departmentsQuery.isLoading ? (
-              <Skeleton className="h-7 w-16" />
-            ) : departmentsQuery.isError ? (
-              <div className="text-sm font-semibold text-destructive">N/A</div>
-            ) : (
-              <div className="text-2xl font-bold text-foreground">
-                {departmentsQuery.data?.length ?? 0}
-              </div>
-            )}
-            <p className="text-[11px] text-muted-foreground mt-1">Clinical specialties</p>
-          </CardContent>
-        </Card>
+        {/* 5. Completed Appointments */}
+        <Link to={`/admin/appointments?status=COMPLETED&fromDate=${todayStr}&toDate=${todayStr}`} className="block focus:outline-none focus:ring-2 focus:ring-primary rounded-lg">
+          <Card className="hover:border-primary/50 hover:bg-muted/30 transition-colors h-full">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-xs font-medium text-muted-foreground">Completed</CardTitle>
+              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+            </CardHeader>
+            <CardContent>
+              {dashboardQuery.isLoading ? (
+                <Skeleton className="h-7 w-16" />
+              ) : dashboardQuery.isError ? (
+                <div className="text-sm font-semibold text-destructive">N/A</div>
+              ) : (
+                <div className="text-2xl font-bold text-foreground">
+                  {dashboardQuery.data?.appointmentsToday?.completed ?? 0}
+                </div>
+              )}
+              <p className="text-[11px] text-muted-foreground mt-1">Finalized today</p>
+            </CardContent>
+          </Card>
+        </Link>
 
-        {/* 6. Revenue / Collections */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-xs font-medium text-muted-foreground">Monthly Revenue</CardTitle>
-            <Receipt className="h-4 w-4 text-emerald-600" />
-          </CardHeader>
-          <CardContent>
-            {dashboardQuery.isLoading ? (
-              <Skeleton className="h-7 w-20" />
-            ) : dashboardQuery.isError ? (
-              <div className="text-sm font-semibold text-destructive">N/A</div>
-            ) : (
-              <div className="text-xl font-bold text-foreground truncate" title={`${dashboardQuery.data?.currency || ''} ${dashboardQuery.data?.collectedThisMonth || '0.00'}`}>
-                {dashboardQuery.data?.currency || 'INR'} {dashboardQuery.data?.collectedThisMonth || '0.00'}
-              </div>
-            )}
-            <p className="text-[11px] text-muted-foreground mt-1 truncate">
-              Today: {dashboardQuery.data?.currency || 'INR'} {dashboardQuery.data?.collectedToday || '0.00'}
-            </p>
-          </CardContent>
-        </Card>
+        {/* 6. Pending Appointments */}
+        <Link to={`/admin/appointments?status=BOOKED,CHECKED_IN,IN_CONSULTATION&fromDate=${todayStr}&toDate=${todayStr}`} className="block focus:outline-none focus:ring-2 focus:ring-primary rounded-lg">
+          <Card className="hover:border-primary/50 hover:bg-muted/30 transition-colors h-full">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-xs font-medium text-muted-foreground">Pending Queue</CardTitle>
+              <AlertCircle className="h-4 w-4 text-orange-500" />
+            </CardHeader>
+            <CardContent>
+              {dashboardQuery.isLoading ? (
+                <Skeleton className="h-7 w-16" />
+              ) : dashboardQuery.isError ? (
+                <div className="text-sm font-semibold text-destructive">N/A</div>
+              ) : (
+                <div className="text-2xl font-bold text-foreground">
+                  {(dashboardQuery.data?.appointmentsToday?.booked ?? 0) +
+                    (dashboardQuery.data?.appointmentsToday?.checkedIn ?? 0) +
+                    (dashboardQuery.data?.appointmentsToday?.inConsultation ?? 0)}
+                </div>
+              )}
+              <p className="text-[11px] text-muted-foreground mt-1">
+                {dashboardQuery.data?.waitingNow != null ? `${dashboardQuery.data.waitingNow} in waiting room` : 'Active today'}
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
+
+        {/* 7. Total Departments */}
+        <Link to="/admin/departments" className="block focus:outline-none focus:ring-2 focus:ring-primary rounded-lg">
+          <Card className="hover:border-primary/50 hover:bg-muted/30 transition-colors h-full">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-xs font-medium text-muted-foreground">Departments</CardTitle>
+              <Building2 className="h-4 w-4 text-teal-600" />
+            </CardHeader>
+            <CardContent>
+              {departmentsQuery.isLoading ? (
+                <Skeleton className="h-7 w-16" />
+              ) : departmentsQuery.isError ? (
+                <div className="text-sm font-semibold text-destructive">N/A</div>
+              ) : (
+                <div className="text-2xl font-bold text-foreground">
+                  {departmentsQuery.data?.length ?? 0}
+                </div>
+              )}
+              <p className="text-[11px] text-muted-foreground mt-1">Specialties</p>
+            </CardContent>
+          </Card>
+        </Link>
+
+        {/* 8. Revenue / Collections */}
+        <Link to="/admin/billing" className="block focus:outline-none focus:ring-2 focus:ring-primary rounded-lg">
+          <Card className="hover:border-primary/50 hover:bg-muted/30 transition-colors h-full">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-xs font-medium text-muted-foreground">Monthly Revenue</CardTitle>
+              <Receipt className="h-4 w-4 text-emerald-600" />
+            </CardHeader>
+            <CardContent>
+              {dashboardQuery.isLoading ? (
+                <Skeleton className="h-7 w-20" />
+              ) : dashboardQuery.isError ? (
+                <div className="text-sm font-semibold text-destructive">N/A</div>
+              ) : (
+                <div className="text-xl font-bold text-foreground truncate" title={`${dashboardQuery.data?.currency || ''} ${dashboardQuery.data?.collectedThisMonth || '0.00'}`}>
+                  {dashboardQuery.data?.currency || 'INR'} {dashboardQuery.data?.collectedThisMonth || '0.00'}
+                </div>
+              )}
+              <p className="text-[11px] text-muted-foreground mt-1 truncate">
+                Today: {dashboardQuery.data?.currency || 'INR'} {dashboardQuery.data?.collectedToday || '0.00'}
+              </p>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
 
       {/* Visualizations Section */}

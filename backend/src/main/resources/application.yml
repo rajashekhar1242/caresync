@@ -56,7 +56,7 @@ management:
 
 caresync:
   jwt:
-    secret: ${CARESYNC_JWT_SECRET}
+    secret: ${CARESYNC_JWT_SECRET:}
     access-token-expiry-seconds: 900
     refresh-token-expiry-seconds: 604800
   cors:

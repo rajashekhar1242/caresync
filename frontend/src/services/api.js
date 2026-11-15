@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { tokenService } from './token.service';
+import { authBroadcast } from './auth-broadcast';
 
 /**
  * Normalizes the API base URL to ensure clean formatting:
@@ -71,19 +72,30 @@ export async function executeTokenRefresh(refreshToken) {
   if (!refreshPromise) {
     refreshPromise = (async () => {
       try {
+        const token = refreshToken || tokenService.getRefreshToken();
+        if (!token) {
+          throw new Error('No refresh token available');
+        }
+
         // Use standalone axios instance to bypass interceptors
         const response = await axios.post(
           `${BASE_URL}/auth/refresh`,
-          { refreshToken },
+          { refreshToken: token },
           { headers: { 'Content-Type': 'application/json' } }
         );
 
         const { accessToken: newAccessToken, refreshToken: newRefreshToken } = response.data;
         tokenService.setTokens(newAccessToken, newRefreshToken);
+        authBroadcast.broadcastTokens(newAccessToken, newRefreshToken, tokenService.getUser());
         return newAccessToken;
       } catch (err) {
-        tokenService.clear();
-        dispatchUnauthorizedOnce();
+        // Distinguish definitive auth failure (HTTP 401) from transient network or server errors
+        const isAuthFailure = err.response && err.response.status === 401;
+        if (isAuthFailure) {
+          tokenService.clear();
+          authBroadcast.broadcastLogout();
+          dispatchUnauthorizedOnce();
+        }
         throw err;
       } finally {
         refreshPromise = null;

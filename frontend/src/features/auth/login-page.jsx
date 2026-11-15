@@ -67,9 +67,8 @@ export function LoginPage() {
     }
   };
 
-  const handleDemoFill = (email, pass) => {
-    setValue('email', email);
-    setValue('password', pass);
+  const handleDemoEmail = (email) => {
+    setValue('email', email, { shouldValidate: true });
   };
 
   return (
@@ -165,39 +164,43 @@ export function LoginPage() {
               </Link>
             </p>
 
-            {/* Demo Credential Shortcuts */}
+            {/* Demo Account Email Shortcuts */}
             <div className="w-full pt-2 border-t text-left">
               <p className="text-[11px] font-semibold text-muted-foreground mb-2 uppercase tracking-wider">
-                Quick Test Roles:
+                Demo Accounts (Quick-Fill Email):
               </p>
               <div className="grid grid-cols-2 gap-1.5 text-xs">
                 <button
                   type="button"
-                  onClick={() => handleDemoFill('admin@caresync.com', 'Admin@123')}
+                  onClick={() => handleDemoEmail('admin@caresync.local')}
                   className="rounded border border-dashed px-2 py-1 text-left text-muted-foreground hover:bg-muted hover:text-foreground truncate"
+                  title="System Administrator (admin@caresync.local)"
                 >
                   Admin
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleDemoFill('receptionist@caresync.com', 'Recept@123')}
+                  onClick={() => handleDemoEmail('reception@caresync.local')}
                   className="rounded border border-dashed px-2 py-1 text-left text-muted-foreground hover:bg-muted hover:text-foreground truncate"
+                  title="Front Desk Receptionist (reception@caresync.local)"
                 >
                   Receptionist
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleDemoFill('dr.qa.live.1794563025465@caresync.local', 'DoctorPassword!123')}
+                  onClick={() => handleDemoEmail('dr.jenkins@caresync.local')}
                   className="rounded border border-dashed px-2 py-1 text-left text-muted-foreground hover:bg-muted hover:text-foreground truncate"
+                  title="Dr. Sarah Jenkins - Cardiology (dr.jenkins@caresync.local)"
                 >
-                  Doctor
+                  Dr. Jenkins (Cardiology)
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleDemoFill('patient@caresync.com', 'Patient@123')}
+                  onClick={() => handleDemoEmail('john.doe@example.com')}
                   className="rounded border border-dashed px-2 py-1 text-left text-muted-foreground hover:bg-muted hover:text-foreground truncate"
+                  title="John Doe - Patient (john.doe@example.com)"
                 >
-                  Patient
+                  John Doe (Patient)
                 </button>
               </div>
             </div>

@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
@@ -11,6 +12,7 @@ import {
   CheckCircle2,
   XCircle,
   RefreshCw,
+  AlertCircle,
   Building2,
   Calendar,
   Clock,
@@ -36,6 +38,7 @@ import { useToast } from '@/hooks/use-toast';
 import { DoctorCreateRequestSchema, DoctorUpdateRequestSchema } from '@/types';
 import {
   useDoctors,
+  useDoctorSchedules,
   useCreateDoctor,
   useUpdateDoctor,
   useSpecializations,
@@ -43,7 +46,55 @@ import {
 } from '@/hooks/use-doctors';
 import { useDepartments } from '@/hooks/use-departments';
 
+function DoctorScheduleSection({ doctorId }) {
+  const scheduleQuery = useDoctorSchedules(doctorId, { enabled: Boolean(doctorId) });
+
+  if (scheduleQuery.isLoading) {
+    return <Skeleton className="h-9 w-full" />;
+  }
+
+  if (scheduleQuery.isError) {
+    return (
+      <div className="flex items-center justify-between text-xs text-destructive bg-destructive/10 border border-destructive/20 rounded p-2">
+        <span className="flex items-center gap-1.5">
+          <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+          Failed to load doctor schedule.
+        </span>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => scheduleQuery.refetch()}
+          className="h-6 px-2 text-[11px] hover:bg-destructive/20 text-destructive hover:text-destructive"
+        >
+          <RefreshCw className="h-3 w-3 mr-1" />
+          Retry
+        </Button>
+      </div>
+    );
+  }
+
+  const entries = scheduleQuery.data?.entries || [];
+  if (entries.length === 0) {
+    return <p className="text-[11px] text-muted-foreground italic">No weekly consultation schedule registered.</p>;
+  }
+
+  return (
+    <div className="space-y-1">
+      <span className="text-muted-foreground font-semibold text-xs block">Weekly Schedule:</span>
+      <div className="flex flex-wrap gap-1.5">
+        {entries.map((e, idx) => (
+          <span key={idx} className="inline-flex items-center text-[10px] px-2 py-0.5 rounded bg-muted font-mono">
+            {e.dayOfWeek.slice(0, 3)}: {e.startTime.slice(0, 5)}–{e.endTime.slice(0, 5)}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function DoctorsPage() {
+  const navigate = useNavigate();
   const { toast } = useToast();
 
   // Filters state
@@ -796,8 +847,26 @@ export function DoctorsPage() {
                 </div>
               </div>
 
-              <DialogFooter className="pt-2">
-                <Button variant="outline" onClick={() => setViewingDoctor(null)}>
+              {/* Weekly Consultation Schedules */}
+              <div className="border-t pt-3">
+                <DoctorScheduleSection doctorId={viewingDoctor.id} />
+              </div>
+
+              <DialogFooter className="pt-2 flex flex-col sm:flex-row sm:justify-between items-stretch sm:items-center gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    navigate(`/admin/appointments?doctorId=${viewingDoctor.id}`);
+                    setViewingDoctor(null);
+                  }}
+                  className="text-xs"
+                >
+                  <Calendar className="h-3.5 w-3.5 mr-1.5" />
+                  View Appointments
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setViewingDoctor(null)}>
                   Close
                 </Button>
               </DialogFooter>

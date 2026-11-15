@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Calendar,
   Search,
@@ -31,16 +32,35 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { useAppointments, useCancelAppointment } from '@/hooks/use-appointments';
 import { useDoctors } from '@/hooks/use-doctors';
+import { getStartOfDayUtc, getExclusiveEndOfDayUtc } from '@/lib/utils';
 
 export function AppointmentsPage() {
   const { toast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  // Filters state
+  // Filters state initialized from URL searchParams
+  const [statusFilter, setStatusFilter] = React.useState(() => searchParams.get('status') || '');
+  const [doctorFilter, setDoctorFilter] = React.useState(() => searchParams.get('doctorId') || '');
+  const [patientFilter, setPatientFilter] = React.useState(() => searchParams.get('patientId') || '');
+  const [fromDate, setFromDate] = React.useState(() => searchParams.get('fromDate') || '');
+  const [toDate, setToDate] = React.useState(() => searchParams.get('toDate') || '');
   const [page, setPage] = React.useState(0);
-  const [statusFilter, setStatusFilter] = React.useState('');
-  const [doctorFilter, setDoctorFilter] = React.useState('');
-  const [fromDate, setFromDate] = React.useState('');
-  const [toDate, setToDate] = React.useState('');
+
+  // Sync state if searchParams change externally (navigation, Back/Forward, parameter removal)
+  React.useEffect(() => {
+    const s = searchParams.get('status') || '';
+    const d = searchParams.get('doctorId') || '';
+    const p = searchParams.get('patientId') || '';
+    const f = searchParams.get('fromDate') || '';
+    const t = searchParams.get('toDate') || '';
+
+    setStatusFilter((prev) => (prev !== s ? s : prev));
+    setDoctorFilter((prev) => (prev !== d ? d : prev));
+    setPatientFilter((prev) => (prev !== p ? p : prev));
+    setFromDate((prev) => (prev !== f ? f : prev));
+    setToDate((prev) => (prev !== t ? t : prev));
+    setPage(0);
+  }, [searchParams]);
 
   // Dialogs state
   const [viewingAppointment, setViewingAppointment] = React.useState(null);
@@ -55,10 +75,11 @@ export function AppointmentsPage() {
     const p = { page, size: 10, sort: 'slotStart,desc' };
     if (statusFilter) p.status = statusFilter;
     if (doctorFilter) p.doctorId = doctorFilter;
-    if (fromDate) p.from = `${fromDate}T00:00:00Z`;
-    if (toDate) p.to = `${toDate}T23:59:59Z`;
+    if (patientFilter) p.patientId = patientFilter;
+    if (fromDate) p.from = getStartOfDayUtc(fromDate);
+    if (toDate) p.to = getExclusiveEndOfDayUtc(toDate);
     return p;
-  }, [page, statusFilter, doctorFilter, fromDate, toDate]);
+  }, [page, statusFilter, doctorFilter, patientFilter, fromDate, toDate]);
 
   const appointmentsQuery = useAppointments(queryParams);
   const cancelMutation = useCancelAppointment();
@@ -93,9 +114,11 @@ export function AppointmentsPage() {
   const handleResetFilters = () => {
     setStatusFilter('');
     setDoctorFilter('');
+    setPatientFilter('');
     setFromDate('');
     setToDate('');
     setPage(0);
+    setSearchParams({});
   };
 
   return (
@@ -129,13 +152,19 @@ export function AppointmentsPage() {
           <select
             value={statusFilter}
             onChange={(e) => {
-              setStatusFilter(e.target.value);
+              const val = e.target.value;
+              setStatusFilter(val);
               setPage(0);
+              const next = new URLSearchParams(searchParams);
+              if (val) next.set('status', val);
+              else next.delete('status');
+              setSearchParams(next);
             }}
             className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-xs"
             aria-label="Filter by appointment status"
           >
             <option value="">All Statuses</option>
+            <option value="BOOKED,CHECKED_IN,IN_CONSULTATION">Pending Queue (Active)</option>
             <option value="BOOKED">Booked</option>
             <option value="CHECKED_IN">Checked In</option>
             <option value="IN_CONSULTATION">In Consultation</option>
@@ -151,8 +180,13 @@ export function AppointmentsPage() {
           <select
             value={doctorFilter}
             onChange={(e) => {
-              setDoctorFilter(e.target.value);
+              const val = e.target.value;
+              setDoctorFilter(val);
               setPage(0);
+              const next = new URLSearchParams(searchParams);
+              if (val) next.set('doctorId', val);
+              else next.delete('doctorId');
+              setSearchParams(next);
             }}
             className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-xs"
             aria-label="Filter by physician"
@@ -173,8 +207,13 @@ export function AppointmentsPage() {
             type="date"
             value={fromDate}
             onChange={(e) => {
-              setFromDate(e.target.value);
+              const val = e.target.value;
+              setFromDate(val);
               setPage(0);
+              const next = new URLSearchParams(searchParams);
+              if (val) next.set('fromDate', val);
+              else next.delete('fromDate');
+              setSearchParams(next);
             }}
             className="h-9 text-xs"
             aria-label="Filter from date"
@@ -188,8 +227,13 @@ export function AppointmentsPage() {
             type="date"
             value={toDate}
             onChange={(e) => {
-              setToDate(e.target.value);
+              const val = e.target.value;
+              setToDate(val);
               setPage(0);
+              const next = new URLSearchParams(searchParams);
+              if (val) next.set('toDate', val);
+              else next.delete('toDate');
+              setSearchParams(next);
             }}
             className="h-9 text-xs"
             aria-label="Filter to date"
@@ -202,13 +246,34 @@ export function AppointmentsPage() {
             variant="ghost"
             size="sm"
             onClick={handleResetFilters}
-            disabled={!statusFilter && !doctorFilter && !fromDate && !toDate}
+            disabled={!statusFilter && !doctorFilter && !patientFilter && !fromDate && !toDate}
             className="h-9 w-full text-xs"
           >
             Reset Filters
           </Button>
         </div>
       </div>
+
+      {/* Active patient filter pill */}
+      {patientFilter && (
+        <div className="flex items-center gap-2 text-xs bg-primary/10 border border-primary/20 text-primary px-3 py-1.5 rounded-md w-fit">
+          <span>Filtering by Patient ID: <strong className="font-mono">{patientFilter}</strong></span>
+          <button
+            type="button"
+            onClick={() => {
+              setPatientFilter('');
+              setPage(0);
+              const p = new URLSearchParams(searchParams);
+              p.delete('patientId');
+              setSearchParams(p);
+            }}
+            className="hover:text-destructive ml-1 font-bold text-sm"
+            aria-label="Clear patient filter"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Main Table / Cards */}
       {appointmentsQuery.isLoading ? (

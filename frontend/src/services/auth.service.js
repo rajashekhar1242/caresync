@@ -1,5 +1,15 @@
 import { apiClient } from './api';
 import { tokenService } from './token.service';
+import { authBroadcast } from './auth-broadcast';
+
+// Single-flight in-flight mutex promises
+let restoreSessionPromise = null;
+let refreshTokenPromise = null;
+
+export const resetAuthServicePromises = () => {
+  restoreSessionPromise = null;
+  refreshTokenPromise = null;
+};
 
 /**
  * Authentication and authorization API service integrating with CareSync backend.
@@ -41,36 +51,87 @@ export const authService = {
 
   /**
    * Rotates access and refresh tokens.
-   * @param {string} refreshToken
+   * Utilizes a single-flight mutex to prevent concurrent refresh calls from invalidating each other.
+   * @param {string} [refreshToken]
    * @returns {Promise<Object>} TokenResponse
    */
   async refreshToken(refreshToken) {
-    const response = await apiClient.post('/auth/refresh', { refreshToken });
-    tokenService.setTokens(response.data.accessToken, response.data.refreshToken);
-    return response.data;
+    if (refreshTokenPromise) {
+      return refreshTokenPromise;
+    }
+
+    const token = refreshToken || tokenService.getRefreshToken();
+    if (!token) {
+      throw new Error('No refresh token available');
+    }
+
+    refreshTokenPromise = (async () => {
+      try {
+        const response = await apiClient.post('/auth/refresh', { refreshToken: token });
+        tokenService.setTokens(response.data.accessToken, response.data.refreshToken);
+        authBroadcast.broadcastTokens(
+          response.data.accessToken,
+          response.data.refreshToken,
+          tokenService.getUser()
+        );
+        return response.data;
+      } finally {
+        refreshTokenPromise = null;
+      }
+    })();
+
+    return refreshTokenPromise;
   },
 
   /**
    * Restores user session on page load using stored refresh token.
    * Rotates token pair, fetches verified user from /api/auth/me, and restores auth state.
+   * Protects against double-mounts (React 18 StrictMode) and rapid reloads via single-flight mutex.
    * @returns {Promise<Object|null>} UserResponse or null if unauthenticated
    */
   async restoreSession() {
-    const refreshToken = tokenService.getRefreshToken();
-    if (!refreshToken) {
-      tokenService.clear();
-      return null;
+    if (restoreSessionPromise) {
+      return restoreSessionPromise;
     }
 
-    try {
-      // 1. Rotate refresh token and obtain new access token
-      await this.refreshToken(refreshToken);
-      // 2. Fetch verified user profile using the new access token
-      return await this.getCurrentUser();
-    } catch (err) {
-      tokenService.clear();
-      throw err;
-    }
+    restoreSessionPromise = (async () => {
+      const refreshToken = tokenService.getRefreshToken();
+      if (!refreshToken) {
+        tokenService.clear();
+        return null;
+      }
+
+      try {
+        // 1. Rotate refresh token and obtain new access token via single-flight mutex
+        await this.refreshToken(refreshToken);
+
+        // 2. Fetch verified user profile using the new access token
+        try {
+          return await this.getCurrentUser();
+        } catch (userErr) {
+          // If /auth/me fails with a transient network error (not 401),
+          // fall back to cached user in sessionStorage if available
+          if (userErr.response?.status !== 401) {
+            const cachedUser = tokenService.getUser();
+            if (cachedUser) {
+              return cachedUser;
+            }
+          }
+          throw userErr;
+        }
+      } catch (err) {
+        // Only wipe tokens on definitive 401 auth rejection
+        if (err.response?.status === 401) {
+          tokenService.clear();
+          authBroadcast.broadcastLogout();
+        }
+        throw err;
+      } finally {
+        restoreSessionPromise = null;
+      }
+    })();
+
+    return restoreSessionPromise;
   },
 
   /**
@@ -78,6 +139,7 @@ export const authService = {
    * @returns {Promise<void>}
    */
   async logout() {
+    authBroadcast.broadcastLogout();
     const refreshToken = tokenService.getRefreshToken();
     try {
       if (refreshToken) {

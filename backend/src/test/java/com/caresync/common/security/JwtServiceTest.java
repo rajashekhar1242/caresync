@@ -80,6 +80,15 @@ class JwtServiceTest {
                 .isEqualTo(ErrorCode.UNAUTHORIZED);
 
         assertThatThrownBy(() -> new JwtService(props("too-short", 900), Clock.systemUTC()))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("caresync.jwt.secret must be at least 32 bytes (256 bits)");
+
+        assertThatThrownBy(() -> new JwtService(props("", 900), Clock.systemUTC()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("caresync.jwt.secret must be configured");
+
+        assertThatThrownBy(() -> new JwtService(props("${CARESYNC_JWT_SECRET}", 900), Clock.systemUTC()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("caresync.jwt.secret must be configured");
     }
 }

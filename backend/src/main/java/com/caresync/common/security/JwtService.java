@@ -33,7 +33,8 @@ public class JwtService {
     public JwtService(CareSyncProperties properties, Clock clock) {
         this.clock = clock;
         CareSyncProperties.Jwt jwtProps = properties.jwt();
-        if (jwtProps == null || jwtProps.secret() == null || jwtProps.secret().isBlank()) {
+        if (jwtProps == null || jwtProps.secret() == null || jwtProps.secret().isBlank()
+                || (jwtProps.secret().startsWith("${") && jwtProps.secret().endsWith("}"))) {
             throw new IllegalStateException("caresync.jwt.secret must be configured");
         }
         this.signingKey = deriveSigningKey(jwtProps.secret());

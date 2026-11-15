@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
@@ -12,6 +13,7 @@ import {
   Shield,
   AlertCircle,
   FileText,
+  Calendar,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -39,6 +41,7 @@ import {
 } from '@/hooks/use-patients';
 
 export function PatientsPage() {
+  const navigate = useNavigate();
   const { toast } = useToast();
 
   // Filters state
@@ -667,8 +670,21 @@ export function PatientsPage() {
                 Patient UUID: {viewingQuery.data.id}
               </div>
 
-              <DialogFooter className="pt-2">
-                <Button variant="outline" onClick={() => setViewingPatientId(null)}>
+              <DialogFooter className="pt-2 flex flex-col sm:flex-row sm:justify-between items-stretch sm:items-center gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    navigate(`/admin/appointments?patientId=${viewingQuery.data.id}`);
+                    setViewingPatientId(null);
+                  }}
+                  className="text-xs"
+                >
+                  <Calendar className="h-3.5 w-3.5 mr-1.5" />
+                  View Appointments
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setViewingPatientId(null)}>
                   Close
                 </Button>
               </DialogFooter>
